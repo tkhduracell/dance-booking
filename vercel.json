@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/dans-se-sync",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }
