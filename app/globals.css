@@ -1,10 +1,35 @@
 @import "tailwindcss";
 
+/* Palette from gasasteget.se */
 @theme {
-  --color-purple-dark: #1a1a2e;
-  --color-purple-main: #4a1a8a;
-  --color-purple-light: #6b3fa0;
-  --color-purple-accent: #8b5fbf;
-  --color-gray-warm: #f5f5f0;
-  --color-yellow-cta: #f5c518;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  --color-purple-dark: #2d284d;
+  --color-purple-main: #4c4a82;
+  --color-purple-light: #7a4a82;
+  --color-purple-accent: #c8b484;
+  --color-gray-warm: #dcdbeb;
+  --color-yellow-cta: #c8b484;
+  --color-card: #f6f5fa;
+
+  /* Remap blue buttons/links to club purple */
+  --color-blue-500: #594e97;
+  --color-blue-600: #4c4a82;
+  --color-blue-700: #3a3262;
+}
+
+@layer base {
+  body {
+    color: #363636;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+}
+
+@utility hero-gradient {
+  background: linear-gradient(180deg, #2d284d 0%, #4b4280 55%, #9e97c4 100%);
 }

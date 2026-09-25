@@ -14,15 +14,15 @@ function formatTime(iso: string): string {
 export function CalendarDay({ day, isToday, isOutside, blocks }: Props) {
   return (
     <div
-      className={`min-h-20 border-t border-gray-200 p-1 sm:min-h-24 sm:p-2 ${
-        isOutside ? "bg-gray-100 text-gray-400" : "bg-white"
+      className={`min-h-20 border-t border-gray-warm p-1 sm:min-h-24 sm:p-2 ${
+        isOutside ? "bg-card text-gray-400" : "bg-white"
       } ${isToday ? "ring-2 ring-purple-accent ring-inset" : ""}`}
     >
       {day !== null && (
         <>
           <span
             className={`text-xs font-medium sm:text-sm ${
-              isToday ? "font-bold text-purple-main" : ""
+              isToday ? "font-bold text-purple-light" : ""
             }`}
           >
             {day}
@@ -34,7 +34,7 @@ export function CalendarDay({ day, isToday, isOutside, blocks }: Props) {
                 className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight sm:text-xs ${
                   block.type === "course"
                     ? "bg-purple-light/20 text-purple-dark"
-                    : "bg-yellow-cta/30 text-purple-dark"
+                    : "bg-purple-accent/35 text-purple-dark"
                 }`}
                 title={`${block.name} ${formatTime(block.startAt)}–${formatTime(block.endAt)}`}
               >

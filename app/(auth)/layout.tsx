@@ -4,11 +4,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen items-center justify-center hero-gradient px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Gasasteget</h1>
-          <p className="mt-1 text-sm text-gray-600">Bokningssystem</p>
+          <h1 className="font-display text-3xl font-semibold lowercase text-white">gåsasteget</h1>
+          <p className="mt-1 text-xs uppercase tracking-[0.3em] text-white/70">Bokningssystem</p>
         </div>
         {children}
       </div>

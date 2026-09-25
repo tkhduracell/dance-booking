@@ -93,29 +93,29 @@ export function MonthCalendar() {
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={prev}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-purple-dark hover:bg-purple-light/10"
+          className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-purple-dark shadow-sm transition hover:bg-[#e4dac3]"
           aria-label="Föregående månad"
         >
           ← Förra
         </button>
-        <h2 className="text-lg font-bold text-purple-dark sm:text-xl">
+        <h2 className="font-display text-lg font-extrabold uppercase tracking-[0.15em] text-purple-dark sm:text-xl">
           {MONTH_NAMES[month]} {year}
         </h2>
         <button
           onClick={next}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-purple-dark hover:bg-purple-light/10"
+          className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-purple-dark shadow-sm transition hover:bg-[#e4dac3]"
           aria-label="Nästa månad"
         >
           Nästa →
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
         <div className="grid grid-cols-7">
           {DAY_NAMES.map((name) => (
             <div
               key={name}
-              className="bg-purple-main py-2 text-center text-xs font-semibold tracking-wide text-white sm:text-sm"
+              className="bg-purple-dark py-2 text-center text-xs font-semibold uppercase tracking-widest text-white sm:text-sm"
             >
               {name}
             </div>

@@ -17,7 +17,7 @@ describe("Home", () => {
   it("renders heading", () => {
     render(<Home />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Gasasteget"
+      "Schema"
     );
   });
 
