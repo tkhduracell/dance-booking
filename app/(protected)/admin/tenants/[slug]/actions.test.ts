@@ -20,6 +20,17 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`redirect: ${url}`);
+  }),
+}));
+
+const mockCookieSet = vi.fn();
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ set: mockCookieSet })),
+}));
+
 vi.mock("@/lib/email/mailer", () => ({
   sendTenantEmail: vi.fn(async () => {}),
 }));
@@ -49,6 +60,8 @@ import {
   setAdminMembership,
   inviteAdminByEmail,
   listTenantMembers,
+  setTenantActive,
+  openTenantAsAdmin,
 } from "./actions";
 
 function tenantsSelectSingle(id: string | null) {
@@ -131,5 +144,111 @@ describe("F9-R13 superadmin members actions", () => {
     const result = await setAdminMembership("nsw", "user-1", "tenant-1", false);
     expect(result.error).toBeDefined();
     expect(result.error).toMatch(/sista admin/);
+  });
+});
+
+describe("F9-R12 go-live gate (setTenantActive)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireSuperAdmin.mockImplementation(async () => {});
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === "platform_audit_log") {
+        return { insert: vi.fn(async () => ({ error: null })) };
+      }
+      throw new Error(`unexpected admin table ${table}`);
+    });
+  });
+
+  it("rejects activation when the SMTP test has not succeeded", async () => {
+    mockServerFrom.mockImplementation((table: string) => {
+      if (table === "tenants") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: { id: "tenant-1", smtp_test_ok: false } }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected server table ${table}`);
+    });
+
+    const result = await setTenantActive("nsw", true);
+    expect(result.error).toBeDefined();
+    expect(result.error).toMatch(/SMTP/);
+  });
+
+  it("activates a tenant whose SMTP test succeeded, and writes an audit row", async () => {
+    const mockUpdate = vi.fn(() => ({ eq: async () => ({ error: null }) }));
+    mockServerFrom.mockImplementation((table: string) => {
+      if (table === "tenants") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: { id: "tenant-1", smtp_test_ok: true } }),
+            }),
+          }),
+          update: mockUpdate,
+        };
+      }
+      throw new Error(`unexpected server table ${table}`);
+    });
+
+    const insertAudit = vi.fn(async () => ({ error: null }));
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === "platform_audit_log") return { insert: insertAudit };
+      throw new Error(`unexpected admin table ${table}`);
+    });
+
+    const result = await setTenantActive("nsw", true);
+    expect(result.error).toBeUndefined();
+    expect(mockUpdate).toHaveBeenCalledWith({ active: true });
+    expect(insertAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_id: "tenant-1", action: "activate_tenant" })
+    );
+  });
+
+  it("requireSuperAdmin guard rejects a non-super-admin caller", async () => {
+    mockRequireSuperAdmin.mockImplementation(async () => {
+      throw new Error("redirect: /");
+    });
+    await expect(setTenantActive("nsw", true)).rejects.toThrow();
+  });
+});
+
+describe("F9-R3 openTenantAsAdmin", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireSuperAdmin.mockImplementation(async () => {});
+    mockServerFrom.mockImplementation((table: string) => {
+      if (table === "tenants") return tenantsSelectSingle("tenant-1");
+      throw new Error(`unexpected server table ${table}`);
+    });
+  });
+
+  it("sets the tenant cookie, writes an audit row, and redirects to /admin", async () => {
+    const insertAudit = vi.fn(async () => ({ error: null }));
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === "platform_audit_log") return { insert: insertAudit };
+      throw new Error(`unexpected admin table ${table}`);
+    });
+
+    await expect(openTenantAsAdmin("nsw")).rejects.toThrow("redirect: /admin");
+
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "tenant",
+      "nsw",
+      expect.objectContaining({ path: "/" })
+    );
+    expect(insertAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_id: "tenant-1", action: "open_as_admin" })
+    );
+  });
+
+  it("requireSuperAdmin guard rejects a non-super-admin caller", async () => {
+    mockRequireSuperAdmin.mockImplementation(async () => {
+      throw new Error("redirect: /");
+    });
+    await expect(openTenantAsAdmin("nsw")).rejects.toThrow();
   });
 });
