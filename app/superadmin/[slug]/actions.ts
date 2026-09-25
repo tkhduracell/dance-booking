@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSuperAdmin } from "@/lib/auth/permissions";
 import { encryptSecret } from "@/lib/email/crypto";
 import { sendTestEmail, getTenantSmtpConfig } from "@/lib/email/mailer";
+import { syncTenant } from "@/lib/dans-se/sync";
 
 const SECURITY_VALUES = ["tls", "starttls", "none"] as const;
 
@@ -108,4 +109,52 @@ export async function sendSmtpTestEmail(
 
   if (!result.ok) return { error: `Testmejl misslyckades: ${result.error}` };
   return { message: "Testmejl skickat." };
+}
+
+/** F5-R7/F9-R7: save dans.se org + token (write-only, encrypted like SMTP). */
+export async function saveDansSeSettings(
+  slug: string,
+  formData: FormData
+): Promise<{ error?: string; message?: string }> {
+  await requireSuperAdmin();
+
+  const tenantId = await loadTenantId(slug);
+  if (!tenantId) return { error: "Klubb hittades inte." };
+
+  const orgRaw = (formData.get("dans_se_org") as string | null)?.trim() ?? "";
+  const token = (formData.get("dans_se_token") as string | null) ?? "";
+
+  // Accept a full URL like https://dans.se/nsw/ and extract the slug.
+  const org = orgRaw.replace(/^https?:\/\/(www\.)?dans\.se\//i, "").replace(/\/.*$/, "");
+
+  const supabase = await createClient();
+  const update: Record<string, unknown> = { dans_se_org: org || null };
+  if (token) {
+    update.dans_se_token_enc = "\\x" + encryptSecret(token).toString("hex");
+  }
+
+  const { error } = await supabase.from("tenants").update(update).eq("id", tenantId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/superadmin/${slug}`);
+  return { message: "dans.se-inställningar sparade." };
+}
+
+/** F5-R1: "Synka nu" — admin-triggered on-demand sync. */
+export async function syncDansSeNow(
+  slug: string
+): Promise<{ error?: string; message?: string }> {
+  await requireSuperAdmin();
+
+  const tenantId = await loadTenantId(slug);
+  if (!tenantId) return { error: "Klubb hittades inte." };
+
+  const result = await syncTenant(tenantId);
+
+  revalidatePath(`/superadmin/${slug}`);
+
+  if (!result.ok) return { error: `Synk misslyckades: ${result.error}` };
+  return {
+    message: `Synk klar: ${result.coursesCount} kurser, ${result.occasionsCount} tillfällen.`,
+  };
 }

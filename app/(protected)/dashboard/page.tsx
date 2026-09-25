@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current";
+import { toTenantLocalIso } from "@/lib/tenant/timezone";
 import { DashboardClient } from "./dashboard-client";
 import { ActivityLog, type ActivityLogRow } from "./activity-log";
 
@@ -26,32 +27,42 @@ export default async function DashboardPage({
   const supabase = await createClient();
   const isAdmin = user.roles.includes("admin");
 
-  const [roomsRes, categoriesRes, bookingsRes, logRes] = await Promise.all([
-    supabase
-      .from("rooms")
-      .select("id, title")
-      .eq("tenant_id", tenant.id)
-      .eq("active", true)
-      .order("sort_order"),
-    supabase
-      .from("categories")
-      .select("id, name")
-      .eq("tenant_id", tenant.id)
-      .eq("active", true)
-      .order("sort_order"),
-    supabase
-      .from("bookings")
-      .select("id, room_id, category_id, title, starts_at, ends_at, booked_by, status")
-      .eq("tenant_id", tenant.id)
-      .eq("status", "confirmed"),
-    supabase
-      .from("activity_log")
-      .select("id, type, before, after, created_at, actor_id, booking_id")
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
-  ]);
+  const [tenantRow, roomsRes, categoriesRes, bookingsRes, logRes, importedRes] =
+    await Promise.all([
+      supabase.from("tenants").select("timezone").eq("id", tenant.id).single(),
+      supabase
+        .from("rooms")
+        .select("id, title")
+        .eq("tenant_id", tenant.id)
+        .eq("active", true)
+        .order("sort_order"),
+      supabase
+        .from("categories")
+        .select("id, name")
+        .eq("tenant_id", tenant.id)
+        .eq("active", true)
+        .order("sort_order"),
+      supabase
+        .from("bookings")
+        .select(
+          "id, room_id, category_id, title, starts_at, ends_at, booked_by, status, conflict_occasion_id"
+        )
+        .eq("tenant_id", tenant.id)
+        .eq("status", "confirmed"),
+      supabase
+        .from("activity_log")
+        .select("id, type, before, after, created_at, actor_id, booking_id")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      // F5: imported courses (read-only), joined with their occasions.
+      supabase
+        .from("imported_occasions")
+        .select("id, starts_at, ends_at, imported_courses(name, removed_at)")
+        .eq("tenant_id", tenant.id),
+    ]);
 
+  const timezone = tenantRow.data?.timezone ?? "Europe/Stockholm";
   const rooms = roomsRes.data ?? [];
   const categories = categoriesRes.data ?? [];
 
@@ -61,10 +72,29 @@ export default async function DashboardPage({
     roomId: b.room_id,
     categoryId: b.category_id,
     title: b.title,
-    startsAt: b.starts_at,
-    endsAt: b.ends_at,
+    startsAt: toTenantLocalIso(b.starts_at, timezone),
+    endsAt: toTenantLocalIso(b.ends_at, timezone),
     canModify: isAdmin || (b.booked_by === user.id && new Date(b.starts_at) > now),
+    hasConflict: Boolean(b.conflict_occasion_id),
   }));
+
+  // F5-R6: imported occasions render read-only on the calendar.
+  const importedOccasions = (importedRes.data ?? [])
+    .filter((occ) => {
+      const course = occ.imported_courses as unknown as
+        | { name: string; removed_at: string | null }
+        | null;
+      return course && !course.removed_at;
+    })
+    .map((occ) => {
+      const course = occ.imported_courses as unknown as { name: string };
+      return {
+        id: occ.id,
+        name: course.name,
+        startsAt: toTenantLocalIso(occ.starts_at, timezone),
+        endsAt: toTenantLocalIso(occ.ends_at, timezone),
+      };
+    });
 
   // Resolve actor display names + room titles for the log, best-effort.
   const actorIds = Array.from(
@@ -115,6 +145,7 @@ export default async function DashboardPage({
         rooms={rooms}
         categories={categories}
         bookings={bookings}
+        importedOccasions={importedOccasions}
         selectedRoomId={selectedRoomId ?? null}
       />
       <ActivityLog entries={activityEntries} />

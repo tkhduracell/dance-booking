@@ -32,6 +32,15 @@ export function accessApprovedEmail(tenantName: string) {
   };
 }
 
+/** F4-R10/F4-R11: a booking got a conflict flag from a dans.se sync. */
+export function conflictFlagEmail(tenantName: string, courseName: string) {
+  return {
+    subject: `Din bokning krockar med en kurs hos ${tenantName}`,
+    html: `<p>En av dina bokningar hos <strong>${esc(tenantName)}</strong> krockar nu med kursen "${esc(courseName)}" som importerats från dans.se.</p><p>Bokningen är fortfarande bekräftad, men vi rekommenderar att du kontaktar klubben eller flyttar bokningen.</p>`,
+    text: `En av dina bokningar hos ${tenantName} krockar nu med kursen "${courseName}" (importerad från dans.se). Bokningen är fortfarande bekräftad, men vi rekommenderar att du kontaktar klubben eller flyttar bokningen.`,
+  };
+}
+
 export function accessDeniedEmail(tenantName: string, reason: string | null) {
   return {
     subject: `Din förfrågan hos ${tenantName}`,

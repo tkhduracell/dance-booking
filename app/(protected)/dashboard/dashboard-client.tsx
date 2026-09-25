@@ -16,17 +16,26 @@ type BookingRow = {
   startsAt: string;
   endsAt: string;
   canModify: boolean;
+  hasConflict?: boolean;
+};
+type ImportedOccasionRow = {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
 };
 
 export function DashboardClient({
   rooms,
   categories,
   bookings,
+  importedOccasions = [],
   selectedRoomId,
 }: {
   rooms: Room[];
   categories: Category[];
   bookings: BookingRow[];
+  importedOccasions?: ImportedOccasionRow[];
   selectedRoomId: string | null;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -37,13 +46,23 @@ export function DashboardClient({
     ? bookings.filter((b) => b.roomId === selectedRoomId)
     : bookings;
 
-  const blocks: CalendarBlock[] = filtered.map((b) => ({
-    id: b.id,
-    name: b.title,
-    type: "event",
-    startAt: b.startsAt,
-    endAt: b.endsAt,
-  }));
+  const blocks: CalendarBlock[] = [
+    ...filtered.map((b) => ({
+      id: b.id,
+      name: b.hasConflict ? `${b.title} (krockar)` : b.title,
+      type: "event" as const,
+      startAt: b.startsAt,
+      endAt: b.endsAt,
+    })),
+    // F5-R6: imported dans.se courses, read-only on the calendar.
+    ...importedOccasions.map((occ) => ({
+      id: `imported-${occ.id}`,
+      name: occ.name,
+      type: "course" as const,
+      startAt: occ.startsAt,
+      endAt: occ.endsAt,
+    })),
+  ];
 
   function openCreate(date?: Date) {
     setEditing(undefined);

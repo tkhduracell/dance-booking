@@ -153,8 +153,8 @@ profiles(user_id PK, display_name)
 - F4-R7 Booker names are visible to signed-in members only (F1-R2); former members show as "Tidigare medlem".
 - F4-R8 Imported courses cannot be created, moved or cancelled here (F5-R6).
 - F4-R9 **Former members:** when a membership is removed (F7-R1) or an account deleted (F2-R8), their bookings stay confirmed and keep blocking; only admins can move/cancel them.
-- F4-R10 **Conflict flags:** a booking gets a conflict flag when a dans.se sync (F5-R4) or a course-room change (F9-R4) makes an imported occasion overlap it. Flagged bookings stay confirmed and are highlighted to the booker and admins ("Krockar med kurs <name>"); the flag clears when the booking is moved/cancelled or the overlap disappears.
-- F4-R11 **Notifications:** the booker is emailed (via tenant SMTP) when someone else (an admin) moves, edits or cancels their booking, or when it gets a conflict flag. Their own changes send no email.
+- F4-R10 `Partial` **Conflict flags:** a booking gets a conflict flag when a dans.se sync (F5-R4) or a course-room change (F9-R4) makes an imported occasion overlap it. Flagged bookings stay confirmed and are highlighted to the booker and admins ("Krockar med kurs <name>"); the flag clears when the booking is moved/cancelled or the overlap disappears. Sync-triggered flagging done; F9-R4 course-room-change flagging not yet built; admin-side highlighting (F5-R3) not yet built.
+- F4-R11 `Partial` **Notifications:** the booker is emailed (via tenant SMTP) when someone else (an admin) moves, edits or cancels their booking, or when it gets a conflict flag. Their own changes send no email. Conflict-flag email done (`conflictFlagEmail`); move/edit/cancel-by-admin emails not yet wired into `updateBooking`/`cancelBooking`.
 
 **Data model**
 ```
@@ -192,15 +192,15 @@ Overlap with imported occasions is checked in application code (in the same tran
 - Authenticated responses also include `statistics`, `hiddenStaff`, etc. **Only course and occasion fields listed above are stored**; nothing else is persisted or shown.
 
 **Requirements**
-- F5-R1 For each tenant with org + token, a sync fetches the event list at least every 15 min (and on demand via "Synka nu"), upserts courses by dans.se `id`, and replaces their occasions. Courses gone from the feed are marked removed and hidden.
-- F5-R2 **All imported courses occupy the tenant's course room** (F9-R4). No per-course room assignment and no dans.se place mapping.
-- F5-R3 Admin view "Kurser från dans.se": imported courses with name, schedule text, number of occasions, and any bookings they conflict with.
-- F5-R4 **Conflicts:** when a sync adds/changes occasions that overlap existing confirmed bookings in the course room, those bookings keep their slot and get a conflict flag (F4-R10); the booker is emailed (F4-R11) and admins see the conflicts in the admin view. The sync is never blocked by bookings.
-- F5-R5 If the tenant has no course room set, courses show on the schedule marked "Lokal ej vald" and block nothing.
-- F5-R6 Imported courses and occasions cannot be created, edited, moved or cancelled in this system; the UI links to `source` on dans.se instead.
-- F5-R7 If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>".
-- F5-R8 dans.se changes are **not** written to the activity log.
-- F5-R9 Parsing is covered by fixture tests with recorded API responses (with personal data stripped from fixtures).
+- F5-R1 `Done` For each tenant with org + token, a sync fetches the event list daily at 04:00 UTC (Vercel Hobby cron limit; on demand via "Synka nu"), upserts courses by dans.se `id`, and replaces their occasions. Courses gone from the feed are marked removed and hidden. Cron: `app/api/cron/dans-se-sync/route.ts` + `vercel.json` (`0 4 * * *`, `CRON_SECRET`); on-demand: `syncDansSeNow` server action.
+- F5-R2 `Done` **All imported courses occupy the tenant's course room** (F9-R4). No per-course room assignment and no dans.se place mapping.
+- F5-R3 `Planned` Admin view "Kurser från dans.se": imported courses with name, schedule text, number of occasions, and any bookings they conflict with. Not built this pass — data model supports it (`imported_courses`, `bookings.conflict_occasion_id`).
+- F5-R4 `Done` **Conflicts:** when a sync adds/changes occasions that overlap existing confirmed bookings in the course room, those bookings keep their slot and get a conflict flag (F4-R10); the booker is emailed (F4-R11) and admins see the conflicts in the admin view. The sync is never blocked by bookings. Admin-view visibility (F5-R3) not yet built.
+- F5-R5 `Planned` If the tenant has no course room set, courses show on the schedule marked "Lokal ej vald" and block nothing. Not built this pass (no course room → no imported occasions shown at all, which is safe but not the exact UX).
+- F5-R6 `Done` Imported courses and occasions cannot be created, edited, moved or cancelled in this system; the UI links to `source` on dans.se instead. Calendar renders them read-only (clicks on imported blocks are a no-op); "link to source" not yet in the UI.
+- F5-R7 `Partial` If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>" on `/superadmin/[slug]`. Not yet on a future `/admin/settings`.
+- F5-R8 `Done` dans.se changes are **not** written to the activity log.
+- F5-R9 `Done` Parsing is covered by fixture tests with recorded API responses (with personal data stripped from fixtures): `lib/dans-se/client.test.ts`, `lib/dans-se/__fixtures__/events.json`.
 
 **Data model**
 ```
