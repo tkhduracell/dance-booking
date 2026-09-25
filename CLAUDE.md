@@ -2,7 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Gasasteget booking app: Next.js 15 (App Router, React 19, Turbopack) + Supabase auth/DB + Tailwind v4. UI text is Swedish (routes too: `/logga-in`, `/registrera`).
+Gasasteget booking app: Next.js 15 (App Router, React 19, Turbopack) + Supabase auth/DB + Tailwind v4. UI text is Swedish. Routes are currently `/logga-in`, `/registrera`; SPEC.md moves them to English slugs (`/login`, `/register`, `/waiting`).
+
+## Spec-driven workflow
+`SPEC.md` is the source of truth. Implement features by ID (e.g. F4-R2); make the acceptance criteria the tests; update the feature's status in the spec in the same PR. If the code needs to diverge from the spec, change the spec first. Unresolved `Q-n` items have proposed defaults, which may be used.
 
 ## Commands (pnpm 10)
 - `pnpm dev` — dev server on http://localhost:4000 (`pnpm start` too)
