@@ -17,6 +17,7 @@ type BookingRow = {
   endsAt: string;
   canModify: boolean;
   hasConflict?: boolean;
+  bookerName?: string;
 };
 type ImportedOccasionRow = {
   id: string;
@@ -47,13 +48,17 @@ export function DashboardClient({
     : bookings;
 
   const blocks: CalendarBlock[] = [
-    ...filtered.map((b) => ({
-      id: b.id,
-      name: b.hasConflict ? `${b.title} (krockar)` : b.title,
-      type: "event" as const,
-      startAt: b.startsAt,
-      endAt: b.endsAt,
-    })),
+    ...filtered.map((b) => {
+      const base = b.hasConflict ? `${b.title} (krockar)` : b.title;
+      return {
+        id: b.id,
+        name: b.bookerName ? `${base} – ${b.bookerName}` : base,
+        type: "event" as const,
+        startAt: b.startsAt,
+        endAt: b.endsAt,
+        bookerName: b.bookerName,
+      };
+    }),
     // F5-R6: imported dans.se courses, read-only on the calendar.
     ...importedOccasions.map((occ) => ({
       id: `imported-${occ.id}`,

@@ -57,6 +57,15 @@ describe("Home", () => {
     });
   });
 
+  it("shows no booker names to visitors (F1-R2)", async () => {
+    render(await Home());
+    await waitFor(() => {
+      expect(screen.getAllByText("Bugg Nybörjare").length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/Tidigare medlem/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/–/)).not.toBeInTheDocument();
+  });
+
   it("navigates to next month", async () => {
     render(await Home());
     const nextButtons = screen.getAllByLabelText("Nästa månad");
