@@ -41,6 +41,33 @@ export function conflictFlagEmail(tenantName: string, courseName: string) {
   };
 }
 
+/** F4-R11: booking moved or edited by someone else (an admin). */
+export function bookingChangedByAdminEmail(
+  tenantName: string,
+  title: string,
+  oldWhen: string,
+  newWhen: string
+) {
+  return {
+    subject: `Din bokning "${title}" har ändrats hos ${tenantName}`,
+    html: `<p>Din bokning <strong>${esc(title)}</strong> hos ${esc(tenantName)} har ändrats av en administratör.</p><p>Från: ${esc(oldWhen)}<br/>Till: ${esc(newWhen)}</p>`,
+    text: `Din bokning "${title}" hos ${tenantName} har ändrats av en administratör.\nFrån: ${oldWhen}\nTill: ${newWhen}`,
+  };
+}
+
+/** F4-R11: booking cancelled by someone else (an admin). */
+export function bookingCancelledByAdminEmail(
+  tenantName: string,
+  title: string,
+  when: string
+) {
+  return {
+    subject: `Din bokning "${title}" har ställts in hos ${tenantName}`,
+    html: `<p>Din bokning <strong>${esc(title)}</strong> (${esc(when)}) hos ${esc(tenantName)} har ställts in av en administratör.</p>`,
+    text: `Din bokning "${title}" (${when}) hos ${tenantName} har ställts in av en administratör.`,
+  };
+}
+
 export function accessDeniedEmail(tenantName: string, reason: string | null) {
   return {
     subject: `Din förfrågan hos ${tenantName}`,

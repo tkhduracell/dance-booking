@@ -2,7 +2,9 @@ import { Logo } from "@/app/components/logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
+import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
 import { SignOutButton } from "@/app/components/auth/sign-out-button";
+import { DeleteAccountButton } from "@/app/components/auth/delete-account-button";
 import { ensureAccessRequest } from "./actions";
 
 export default async function ProtectedLayout({
@@ -30,13 +32,15 @@ export default async function ProtectedLayout({
   }
 
   const isAdmin = currentUser.roles.includes("admin");
+  const tenant = await getCurrentTenant();
+  const logoUrl = tenant ? await getTenantLogoUrl(tenant.id) : null;
 
   return (
     <div className="min-h-screen bg-gray-warm">
       <header className="hero-gradient text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <a href="/dashboard" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" /></a>
+            <a href="/dashboard" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" logoUrl={logoUrl} /></a>
             <nav className="flex gap-4 text-sm">
               <a
                 href="/dashboard"
@@ -56,6 +60,7 @@ export default async function ProtectedLayout({
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-white/80">{user.email}</span>
+            <DeleteAccountButton />
             <SignOutButton />
           </div>
         </div>

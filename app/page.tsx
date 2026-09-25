@@ -1,12 +1,16 @@
 import { Logo } from "@/app/components/logo";
 import { MonthCalendar } from "./components/calendar/MonthCalendar";
+import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
 
-export default function Home() {
+export default async function Home() {
+  const tenant = await getCurrentTenant();
+  const logoUrl = tenant ? await getTenantLogoUrl(tenant.id) : null;
+
   return (
     <main className="flex min-h-screen flex-col bg-gray-warm">
       <header className="hero-gradient text-white">
         <div className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:pb-14">
-          <Logo variant="horizontal" className="h-10 w-auto" />
+          <Logo variant="horizontal" className="h-10 w-auto" logoUrl={logoUrl} />
           <h1 className="mt-8 font-display text-3xl font-extrabold uppercase tracking-[0.2em] sm:text-5xl">
             Schema
           </h1>

@@ -96,7 +96,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 - F2-R5 After sign-in the user returns to the tenant domain and page they started from. **(change, F0)**
 - F2-R6 Unauthenticated access to app routes (`/dashboard`, `/admin`, booking pages) redirects to `/login?next=<path>`; signed-in users on `/login` go to `/dashboard`.
 - F2-R7 Sign-out available everywhere when signed in, including the waiting page.
-- F2-R8 A member can **delete their own account** (user menu → confirm). Effects: memberships and pending requests removed in all tenants; bookings (future and past) are kept and shown as "Tidigare medlem"; activity log entries keep their text with the actor shown as "Tidigare medlem"; the auth user is deleted.
+- F2-R8 `Done` A member can **delete their own account** (user menu → confirm). Effects: memberships and pending requests removed in all tenants; bookings (future and past) are kept and shown as "Tidigare medlem"; activity log entries keep their text with the actor shown as "Tidigare medlem" (via `ON DELETE SET NULL` on `booked_by`/`actor_id`); the auth user is deleted (`deleteOwnAccount` server action, "Ta bort konto" in the user menu with a `confirm()` dialog).
 
 **Acceptance criteria**
 - Given a new person enters their email on `boka.nackswinget.se`, then they receive an email sent via Nackswinget's SMTP with a link/code; using it signs them in and creates their account.
@@ -149,12 +149,12 @@ profiles(user_id PK, display_name)
 - F4-R3 A booking may start at most `max_days_ahead` days from today (tenant setting, default 90), and not in the past.
 - F4-R4 **Move:** the booker (own bookings, until start) or an admin (any booking, any time) can change room, start and end. The same rules as creation apply (F4-R2, F4-R3). Title/category can also be edited.
 - F4-R5 **Cancel:** same permissions as move. Sets status `cancelled` (kept for history), frees the slot, and hides it from the schedule.
-- F4-R6 Every create, move, edit and cancel writes an activity log entry (F8) in the same transaction.
+- F4-R6 `Done` Every create, move, edit and cancel writes an activity log entry (F8) in the same transaction. Implemented as Postgres RPCs (`create_booking_with_log`, `update_booking_with_log`, `cancel_booking_with_log`, SECURITY DEFINER, atomic function bodies) called from `createBooking`/`updateBooking`/`cancelBooking` instead of two separate client-side writes.
 - F4-R7 Booker names are visible to signed-in members only (F1-R2); former members show as "Tidigare medlem".
 - F4-R8 Imported courses cannot be created, moved or cancelled here (F5-R6).
-- F4-R9 **Former members:** when a membership is removed (F7-R1) or an account deleted (F2-R8), their bookings stay confirmed and keep blocking; only admins can move/cancel them.
-- F4-R10 `Partial` **Conflict flags:** a booking gets a conflict flag when a dans.se sync (F5-R4) or a course-room change (F9-R4) makes an imported occasion overlap it. Flagged bookings stay confirmed and are highlighted to the booker and admins ("Krockar med kurs <name>"); the flag clears when the booking is moved/cancelled or the overlap disappears. Sync-triggered flagging done; F9-R4 course-room-change flagging not yet built; admin-side highlighting (F5-R3) not yet built.
-- F4-R11 `Partial` **Notifications:** the booker is emailed (via tenant SMTP) when someone else (an admin) moves, edits or cancels their booking, or when it gets a conflict flag. Their own changes send no email. Conflict-flag email done (`conflictFlagEmail`); move/edit/cancel-by-admin emails not yet wired into `updateBooking`/`cancelBooking`.
+- F4-R9 **Former members:** when a membership is removed (F7-R1) or an account deleted (F2-R8), their bookings stay confirmed and keep blocking; only admins can move/cancel them. `booked_by`/`activity_log.actor_id` are `ON DELETE SET NULL`; admin views (`/admin/bookings`) render a null owner as "Tidigare medlem". Not yet wired into the member-facing dashboard UI (F4-R7 name display).
+- F4-R10 `Partial` **Conflict flags:** a booking gets a conflict flag when a dans.se sync (F5-R4) or a course-room change (F9-R4) makes an imported occasion overlap it. Flagged bookings stay confirmed and are highlighted to the booker and admins ("Krockar med kurs <name>"); the flag clears when the booking is moved/cancelled or the overlap disappears. Sync-triggered flagging done; F9-R4 course-room-change flagging done (`setCourseRoom` action, immediate flag + summary message, no separate preview-before-confirm step — simplification); admin-side highlighting done (`/admin/bookings`, `/admin/courses`).
+- F4-R11 `Done` **Notifications:** the booker is emailed (via tenant SMTP) when someone else (an admin) moves, edits or cancels their booking, or when it gets a conflict flag. Their own changes send no email. Conflict-flag email (`conflictFlagEmail`) and move/edit/cancel-by-admin emails (`bookingChangedByAdminEmail`, `bookingCancelledByAdminEmail`) are both wired in.
 
 **Data model**
 ```
@@ -194,11 +194,11 @@ Overlap with imported occasions is checked in application code (in the same tran
 **Requirements**
 - F5-R1 `Done` For each tenant with org + token, a sync fetches the event list daily at 04:00 UTC (Vercel Hobby cron limit; on demand via "Synka nu"), upserts courses by dans.se `id`, and replaces their occasions. Courses gone from the feed are marked removed and hidden. Cron: `app/api/cron/dans-se-sync/route.ts` + `vercel.json` (`0 4 * * *`, `CRON_SECRET`); on-demand: `syncDansSeNow` server action.
 - F5-R2 `Done` **All imported courses occupy the tenant's course room** (F9-R4). No per-course room assignment and no dans.se place mapping.
-- F5-R3 `Planned` Admin view "Kurser från dans.se": imported courses with name, schedule text, number of occasions, and any bookings they conflict with. Not built this pass — data model supports it (`imported_courses`, `bookings.conflict_occasion_id`).
-- F5-R4 `Done` **Conflicts:** when a sync adds/changes occasions that overlap existing confirmed bookings in the course room, those bookings keep their slot and get a conflict flag (F4-R10); the booker is emailed (F4-R11) and admins see the conflicts in the admin view. The sync is never blocked by bookings. Admin-view visibility (F5-R3) not yet built.
+- F5-R3 `Done` Admin view "Importerade kurser" (`/admin/courses`): imported courses with name, schedule text, number of occasions, and count of bookings they conflict with. Built via `get_imported_courses_with_conflicts` RPC.
+- F5-R4 `Done` **Conflicts:** when a sync adds/changes occasions that overlap existing confirmed bookings in the course room, those bookings keep their slot and get a conflict flag (F4-R10); the booker is emailed (F4-R11) and admins see the conflicts in the admin view (`/admin/courses`, `/admin/bookings`). The sync is never blocked by bookings.
 - F5-R5 `Planned` If the tenant has no course room set, courses show on the schedule marked "Lokal ej vald" and block nothing. Not built this pass (no course room → no imported occasions shown at all, which is safe but not the exact UX).
 - F5-R6 `Done` Imported courses and occasions cannot be created, edited, moved or cancelled in this system; the UI links to `source` on dans.se instead. Calendar renders them read-only (clicks on imported blocks are a no-op); "link to source" not yet in the UI.
-- F5-R7 `Partial` If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>" on `/superadmin/[slug]`. Not yet on a future `/admin/settings`.
+- F5-R7 `Done` If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>" on `/superadmin/[slug]` and on `/admin/settings`.
 - F5-R8 `Done` dans.se changes are **not** written to the activity log.
 - F5-R9 `Done` Parsing is covered by fixture tests with recorded API responses (with personal data stripped from fixtures): `lib/dans-se/client.test.ts`, `lib/dans-se/__fixtures__/events.json`.
 
@@ -240,12 +240,12 @@ dans_se_sync_runs(id, tenant_id, started_at, finished_at, ok, error NULL, events
 - Given "Lilla salen" is selected and they click "+ Lägg till aktivitet", then the form opens with room = Lilla salen.
 - Given they click an empty day (e.g. 14 April) in the calendar, then the form opens with date = 14 April.
 
-## F7. Tenant administration — `Planned`
+## F7. Tenant administration — `Partial`
 
-- F7-R1 Members: list members with role; grant/revoke `booker`/`admin`; remove membership. Removing shows how many future bookings the member has; they are kept (F4-R9). An admin cannot remove or demote the tenant's last admin.
-- F7-R2 Rooms and course room: see F9-R4. Categories: see F9-R5.
-- F7-R3 Tenant settings, theme, dans.se and SMTP: see F9.
-- F7-R4 All bookings: list/filter by room/date/user/conflict; move/cancel any.
+- F7-R1 `Done` Members (`/admin/members`): list members with role; grant/revoke `booker`/`admin`; remove membership. Removing shows how many future bookings the member has (returned in the action's message); they are kept (F4-R9). An admin cannot remove or demote the tenant's last admin (`admin_count_in_tenant` RPC guard).
+- F7-R2 `Done` Rooms and course room: see F9-R4. Categories: see F9-R5.
+- F7-R3 `Done` Tenant settings, theme, dans.se and SMTP: see F9 (`/admin/settings`).
+- F7-R4 `Done` All bookings (`/admin/bookings`): list/filter by room/user/conflict (query params, server-side filtering — no date-range filter, simplification); move/cancel any (reuses `updateBooking`/`cancelBooking`).
 
 **Acceptance criteria**
 - Given tenant A has one admin, when that admin tries to demote themselves, then it's rejected.
@@ -276,7 +276,7 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 - Given 25 entries, then the member view shows the 20 newest.
 - Given a visitor or pending user, then no activity log is shown and a direct query returns no rows.
 
-## F9. Super-admin & tenant settings — `Partial`
+## F9. Super-admin & tenant settings — `Partial` (tenant settings mostly `Done`/`Partial`, super-admin unchanged this pass)
 
 **Goal:** The platform owner can onboard clubs, and each club can configure its import, rooms, categories, email and look.
 
@@ -287,11 +287,11 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 - F9-R12 **Go-live check:** a tenant can't be activated until its SMTP test (F9-R10) succeeds.
 
 **Tenant settings** (`/admin/settings`, editable by tenant admins and super-admins)
-- F9-R4 **Lokaler (rooms):** create/rename/reorder/deactivate rooms (title, description, active); choose the **course room**. Changing the course room first shows which bookings in the new room would conflict with imported occasions; on confirm, those get conflict flags (F4-R10). Deactivated rooms can't be booked; existing bookings stay.
-- F9-R5 **Kategorier:** create/rename/recolour/reorder/deactivate booking categories (name + colour). New tenants start with Träning, Privatlektion, Föreningsaktivitet (default colours). At least one active category is required.
-- F9-R6 **General:** name, logo upload (PNG/SVG), timezone (default `Europe/Stockholm`), max days ahead for bookings (default 90).
-- F9-R7 **dans.se import:** dans.se link or org slug (e.g. `https://dans.se/nsw/` or `nsw`; the slug is extracted) and **API token (required for import)**. Saving validates by fetching the feed and showing the number of events found. "Synka nu" button, last sync status.
-- F9-R8 **Theme:** colour pickers with hex input for: primary, primary text (on primary), secondary, accent, background, surface (cards), text, muted text; plus header gradient start/end. Live preview of header, calendar, buttons and a booking chip while editing. "Återställ standard" resets to the platform default. Contrast warning (not block) when text/background pairs fall below WCAG AA 4.5:1. Applied as server-rendered CSS variables (no flash of default colours); components use the variables, not hard-coded colours. **(change)** from today's fixed palette in `globals.css`, which becomes Gåsasteget's seeded theme.
+- F9-R4 `Partial` **Lokaler (rooms):** create/rename/reorder/deactivate rooms (title, active — description editable via `updateRoom` but no dedicated UI field yet); choose the **course room**. Simplification: changing the course room immediately flags conflicting bookings and returns a summary message ("X bokningar flaggades") instead of a separate preview-before-confirm step (F4-R10). Deactivated rooms can't be booked; existing bookings stay.
+- F9-R5 `Done` **Kategorier:** create/recolour/deactivate booking categories (name + colour) at `/admin/settings`. New tenants start with Träning, Privatlektion, Föreningsaktivitet (default colours, from existing seed). At least one active category is required (enforced server-side). Rename/reorder UI not built (simplification — colour/active toggle and create are).
+- F9-R6 `Partial` **General** (`/admin/settings`): name, timezone (default `Europe/Stockholm`), max days ahead for bookings (default 90), club logo upload (PNG/WebP only — SVG deliberately unsupported, stored-XSS risk via inline `<script>`/`on*` — ≤1MB, magic-byte-verified server-side, not just MIME type) stored in Supabase Storage bucket `tenant-logos` under a per-tenant folder (`tenants.logo_path`), admin-only write via storage RLS scoped to the tenant's folder, public read. Rendered above "Bokningssystem" on auth pages and in the protected/start-page headers via the `Logo` component; falls back to the current Gåsasteget default images when unset. Plain-URL fallback field removed.
+- F9-R7 `Done` (unchanged) **dans.se import:** dans.se link or org slug and API token — still at `/superadmin/[slug]`; save/sync logic factored into `lib/tenant-settings/save.ts` and reused by `/admin/settings`.
+- F9-R8 `Partial` **Theme** (`/admin/settings`): hex colour inputs for primary, primary text (on primary), secondary, accent, background, surface, text, muted text, header gradient start/end; saved to `tenants.theme` jsonb. Applied as server-rendered CSS variables in the root layout (`:root{--color-primary:...}` etc., no flash of default colours). Additionally, `tenants.bg_gradient_from/via/to` (hex, `via` and `to` nullable — a solid colour when only `from` is set) drive `--tenant-bg`, consumed by the `hero-gradient` utility (used on the start-page hero, the auth layout background, and the protected header) in place of the old hard-coded gradient; defaults reproduce the current Gåsasteget look (`#2d284d` → `#4b4280` → `#9e97c4`). `--color-primary`/`--color-secondary` now also drive the `purple-main`/`purple-light` Tailwind tokens so the saved theme colours are visually applied, not just present as unused CSS vars. No live preview beyond the gradient/logo pickers' own inline preview, no "Återställ standard", no contrast warning (all skipped).
 - F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings. `Done` — implemented at `/superadmin/[slug]` (not yet `/admin/settings`; tenant-admin-facing route is future work).
 - F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them. `Done` for SMTP password (app-side AES-256-GCM, `SMTP_ENC_KEY`); dans.se token encryption unchanged/still plaintext.
 
