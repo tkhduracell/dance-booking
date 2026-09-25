@@ -122,3 +122,28 @@ export async function requireRole(roleName: string): Promise<void> {
     redirect("/dashboard");
   }
 }
+
+/**
+ * F9-R1: is the current auth user's verified email listed in
+ * platform_admins? Not tenant-scoped.
+ */
+export async function isSuperAdmin(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data } = await supabase.rpc("is_super_admin", {
+    p_user_id: user.id,
+  });
+  return Boolean(data);
+}
+
+/** F9-R2: require super-admin. Redirects to /dashboard if denied. */
+export async function requireSuperAdmin(): Promise<void> {
+  const allowed = await isSuperAdmin();
+  if (!allowed) {
+    redirect("/dashboard");
+  }
+}

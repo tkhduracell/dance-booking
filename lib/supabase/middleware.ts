@@ -80,21 +80,34 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Permanent redirects for old Swedish route slugs (F2/F9 non-functional req).
+  const oldToNew: Record<string, string> = {
+    "/logga-in": "/login",
+    "/registrera": "/register",
+  };
+  const newPath = oldToNew[request.nextUrl.pathname];
+  if (newPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = newPath;
+    return NextResponse.redirect(url, 308);
+  }
+
   // Redirect unauthenticated users from protected routes
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/admin");
+    request.nextUrl.pathname.startsWith("/admin") ||
+    request.nextUrl.pathname.startsWith("/superadmin") ||
+    request.nextUrl.pathname.startsWith("/waiting");
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/logga-in";
+    url.pathname = "/login";
+    url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from auth pages
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/logga-in") ||
-    request.nextUrl.pathname.startsWith("/registrera");
+  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
 
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();

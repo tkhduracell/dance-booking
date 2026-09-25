@@ -15,5 +15,5 @@ export async function GET(request: Request) {
   }
 
   // Return to sign-in page on error
-  return NextResponse.redirect(`${origin}/logga-in?error=auth`);
+  return NextResponse.redirect(`${origin}/login?error=auth`);
 }

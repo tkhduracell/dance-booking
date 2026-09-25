@@ -61,6 +61,24 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000011' WHERE id = '00000000-0000-0000-0000-000000000001';
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000012' WHERE id = '00000000-0000-0000-0000-000000000002';
 
+-- F9-R10: both tenants' SMTP → local Supabase mail catcher (Inbucket/Mailpit),
+-- no auth needed. See supabase/config.toml [local_smtp] smtp_port.
+UPDATE public.tenants SET
+  smtp_host = '127.0.0.1',
+  smtp_port = 54325,
+  smtp_security = 'none',
+  smtp_from_name = 'Gåsasteget',
+  smtp_from_address = 'no-reply@gasasteget.localhost'
+WHERE id = '00000000-0000-0000-0000-000000000001';
+
+UPDATE public.tenants SET
+  smtp_host = '127.0.0.1',
+  smtp_port = 54325,
+  smtp_security = 'none',
+  smtp_from_name = 'Nackswinget',
+  smtp_from_address = 'no-reply@nsw.localhost'
+WHERE id = '00000000-0000-0000-0000-000000000002';
+
 -- ============================================================
 -- Local dev auth users (dev only, known passwords)
 -- super-admin: buggfille@gmail.com / devpassword123
@@ -168,3 +186,20 @@ BEGIN
     ON CONFLICT (user_id, tenant_id) DO NOTHING;
   END IF;
 END $$;
+
+-- GoTrue fails ("Database error finding user") on NULL token columns
+UPDATE auth.users SET
+  confirmation_token = COALESCE(confirmation_token, ''),
+  recovery_token = COALESCE(recovery_token, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  email_change_token_current = COALESCE(email_change_token_current, ''),
+  email_change = COALESCE(email_change, ''),
+  phone_change = COALESCE(phone_change, ''),
+  phone_change_token = COALESCE(phone_change_token, ''),
+  reauthentication_token = COALESCE(reauthentication_token, '');
+
+INSERT INTO auth.identities (id, user_id, provider_id, provider, identity_data, created_at, updated_at, last_sign_in_at)
+SELECT gen_random_uuid(), u.id, u.id::text, 'email',
+  jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now()
+FROM auth.users u
+WHERE NOT EXISTS (SELECT 1 FROM auth.identities i WHERE i.user_id = u.id);
