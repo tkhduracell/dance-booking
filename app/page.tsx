@@ -39,7 +39,7 @@ export default async function Home({
 
   const [tenantRow, roomsRes, categoriesRes, bookingsRes, logRes, importedRes] =
     await Promise.all([
-      supabase.from("tenants").select("timezone").eq("id", tenant.id).single(),
+      supabase.from("tenants").select("timezone, course_room_id").eq("id", tenant.id).single(),
       supabase
         .from("rooms")
         .select("id, title")
@@ -73,6 +73,7 @@ export default async function Home({
     ]);
 
   const timezone = tenantRow.data?.timezone ?? "Europe/Stockholm";
+  const hasCourseRoom = Boolean(tenantRow.data?.course_room_id);
   const rooms = roomsRes.data ?? [];
   const categories = categoriesRes.data ?? [];
 
@@ -98,9 +99,11 @@ export default async function Home({
     })
     .map((occ) => {
       const course = occ.imported_courses as unknown as { name: string };
+      // F5-R5: no course room configured → occasions still show, labeled.
+      const name = hasCourseRoom ? course.name : `${course.name} (Lokal ej vald)`;
       return {
         id: occ.id,
-        name: course.name,
+        name,
         startsAt: toTenantLocalIso(occ.starts_at, timezone),
         endsAt: toTenantLocalIso(occ.ends_at, timezone),
       };
