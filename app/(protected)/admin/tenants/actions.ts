@@ -38,6 +38,6 @@ export async function createTenant(
     if (domainError) return { error: domainError.message };
   }
 
-  revalidatePath("/superadmin");
+  revalidatePath("/admin/tenants");
   return {};
 }

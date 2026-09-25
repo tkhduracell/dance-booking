@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createBooking, updateBooking, cancelBooking } from "./actions";
+import { createBooking, updateBooking, cancelBooking } from "./dashboard-actions";
 
 type Room = { id: string; title: string };
 type Category = { id: string; name: string };

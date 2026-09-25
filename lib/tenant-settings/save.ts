@@ -1,5 +1,5 @@
 // Shared save logic for tenant settings (F9), called from both
-// /superadmin/[slug]/actions.ts (super-admin) and
+// /(protected)/admin/tenants/[slug]/actions.ts (super-admin) and
 // /(protected)/admin/settings/actions.ts (tenant admin). Permission checks
 // are done by the callers before invoking these.
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/app/components/logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -5,7 +6,6 @@ import { getCurrentUser } from "@/lib/auth/permissions";
 import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
 import { SignOutButton } from "@/app/components/auth/sign-out-button";
 import { DeleteAccountButton } from "@/app/components/auth/delete-account-button";
-import { ensureAccessRequest } from "./actions";
 
 export default async function ProtectedLayout({
   children,
@@ -24,11 +24,8 @@ export default async function ProtectedLayout({
   const currentUser = await getCurrentUser();
   const hasAccess = currentUser && currentUser.roles.length > 0;
 
-  // F3-R1/F3-R8: pending/no-membership users are sent to /waiting, which
-  // handles auto-queueing and shows request status.
   if (!hasAccess) {
-    await ensureAccessRequest();
-    redirect("/waiting");
+    redirect("/");
   }
 
   const isAdmin = currentUser.roles.includes("admin");
@@ -40,21 +37,21 @@ export default async function ProtectedLayout({
       <header className="hero-gradient text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <a href="/dashboard" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" logoUrl={logoUrl} /></a>
+            <Link href="/" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" logoUrl={logoUrl} /></Link>
             <nav className="flex gap-4 text-sm">
-              <a
-                href="/dashboard"
+              <Link
+                href="/"
                 className="text-white/80 hover:text-white"
               >
                 Dashboard
-              </a>
+              </Link>
               {isAdmin && (
-                <a
+                <Link
                   href="/admin"
                   className="text-white/80 hover:text-white"
                 >
                   Admin
-                </a>
+                </Link>
               )}
             </nav>
           </div>

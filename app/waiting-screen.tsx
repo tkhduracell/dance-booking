@@ -1,34 +1,14 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current";
 import { SignOutButton } from "@/app/components/auth/sign-out-button";
 import type { AccessRequest } from "@/lib/auth/types";
+import type { User } from "@supabase/supabase-js";
 import { WaitingDetailsForm } from "./waiting-details-form";
 import { RequestAgainButton } from "./request-again-button";
 
-export const dynamic = "force-dynamic";
-
-export const metadata = {
-  title: "Väntar på godkännande - Gasasteget",
-};
-
-export default async function WaitingPage() {
+// F3-R1/F3-R8: pending/no-membership users see this instead of the dashboard.
+export async function WaitingScreen({ user }: { user: User }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // F3-R8: if the user already has a membership, send them on to /dashboard.
-  const currentUser = await getCurrentUser();
-  if (currentUser && currentUser.roles.length > 0) {
-    redirect("/dashboard");
-  }
-
   const tenant = await getCurrentTenant();
 
   const { data: latest } = tenant

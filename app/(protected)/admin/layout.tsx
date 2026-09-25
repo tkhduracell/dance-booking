@@ -1,4 +1,5 @@
-import { requireRole } from "@/lib/auth/permissions";
+import { redirect } from "next/navigation";
+import { hasRole, isSuperAdmin } from "@/lib/auth/permissions";
 
 const TABS = [
   { href: "/admin", label: "Förfrågningar" },
@@ -13,12 +14,17 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("admin");
+  const [isAdmin, superAdmin] = await Promise.all([hasRole("admin"), isSuperAdmin()]);
+  if (!isAdmin && !superAdmin) {
+    redirect("/");
+  }
+
+  const tabs = superAdmin ? [...TABS, { href: "/admin/tenants", label: "Klubbar" }] : TABS;
 
   return (
     <div>
       <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-gray-200">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <a
             key={tab.href}
             href={tab.href}

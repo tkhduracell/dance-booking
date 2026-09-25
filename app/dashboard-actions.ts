@@ -149,7 +149,7 @@ export async function createBooking(input: {
     return { ok: false, error: error.message ?? "Tiden krockar med en annan bokning" };
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -247,7 +247,7 @@ export async function updateBooking(
     });
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -302,6 +302,6 @@ export async function cancelBooking(bookingId: string): Promise<ActionResult> {
     });
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/");
   return { ok: true };
 }

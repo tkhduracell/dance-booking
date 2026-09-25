@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cancelBooking, updateBooking } from "@/app/(protected)/dashboard/actions";
+import { cancelBooking, updateBooking } from "@/app/dashboard-actions";
 
 type Row = {
   id: string;
