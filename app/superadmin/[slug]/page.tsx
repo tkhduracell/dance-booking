@@ -3,6 +3,8 @@ import { requireSuperAdmin } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { SmtpSettingsForm } from "./smtp-settings-form";
 import { DansSeSettingsForm } from "./dans-se-settings-form";
+import { MembersSection } from "./members-section";
+import { listTenantMembers, listPendingRequests } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,18 @@ export default async function TenantSettingsPage({
 
   if (!tenant) notFound();
 
+  const { data: tenantRow } = await supabase
+    .from("tenants")
+    .select("id")
+    .eq("slug", slug)
+    .single();
+  const tenantId = tenantRow?.id as string;
+
+  const [members, pendingRequests] = await Promise.all([
+    listTenantMembers(slug),
+    listPendingRequests(slug),
+  ]);
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">{slug} — inställningar</h1>
@@ -47,6 +61,13 @@ export default async function TenantSettingsPage({
         </p>
         <DansSeSettingsForm slug={slug} tenant={tenant} />
       </div>
+
+      <MembersSection
+        slug={slug}
+        tenantId={tenantId}
+        members={members}
+        pendingRequests={pendingRequests}
+      />
     </div>
   );
 }
