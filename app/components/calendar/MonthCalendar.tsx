@@ -5,6 +5,13 @@ import { CalendarDay } from "./CalendarDay";
 import { fetchDansEvents } from "./dans-api";
 import type { CalendarBlock } from "./types";
 
+type Props = {
+  /** When provided, skips the dans.se fetch and renders these blocks instead. */
+  blocks?: CalendarBlock[];
+  onDayClick?: (date: Date) => void;
+  onBlockClick?: (blockId: string) => void;
+};
+
 const DAY_NAMES = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
 const MONTH_NAMES = [
   "Januari", "Februari", "Mars", "April", "Maj", "Juni",
@@ -52,16 +59,19 @@ function blocksByDay(blocks: CalendarBlock[]): Map<number, CalendarBlock[]> {
   return map;
 }
 
-export function MonthCalendar() {
+export function MonthCalendar({ blocks: providedBlocks, onDayClick, onBlockClick }: Props = {}) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
 
-  const [allBlocks, setAllBlocks] = useState<CalendarBlock[]>([]);
+  const [fetchedBlocks, setFetchedBlocks] = useState<CalendarBlock[]>([]);
 
   useEffect(() => {
-    fetchDansEvents().then(setAllBlocks);
-  }, []);
+    if (providedBlocks) return;
+    fetchDansEvents().then(setFetchedBlocks);
+  }, [providedBlocks]);
+
+  const allBlocks = providedBlocks ?? fetchedBlocks;
 
   const cells = getCalendarGrid(year, month);
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
@@ -129,6 +139,12 @@ export function MonthCalendar() {
               isToday={!cell.isOutside && cell.day === today}
               isOutside={cell.isOutside}
               blocks={cell.isOutside ? [] : (byDay.get(cell.day) ?? [])}
+              onDayClick={
+                !cell.isOutside && onDayClick
+                  ? () => onDayClick(new Date(year, month, cell.day))
+                  : undefined
+              }
+              onBlockClick={onBlockClick}
             />
           ))}
         </div>

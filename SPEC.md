@@ -139,7 +139,7 @@ profiles(user_id PK, display_name)
 - Given a new request, then each admin of that tenant (and nobody else) receives one email.
 - Given a non-admin calls the approve action, then nothing changes.
 
-## F4. Bookings — `Planned`
+## F4. Bookings — `Partial`
 
 **Goal:** Members book a room for practice, lessons or club activities (e.g. parties) without double-booking. Scope v1: **single bookings only**, always in the booker's own name.
 
@@ -219,7 +219,7 @@ dans_se_sync_runs(id, tenant_id, started_at, finished_at, ok, error NULL, events
 - Given a booker opens an imported course, then no edit/move/cancel controls are shown, only a link to dans.se.
 - Given the dans.se API returns 500 during sync, then the schedule keeps showing the previously synced courses.
 
-## F6. Member app layout — `Planned`
+## F6. Member app layout — `Partial`
 
 **Goal:** Once signed in to a club, members land directly in the calendar and can book from there.
 
@@ -252,7 +252,7 @@ dans_se_sync_runs(id, tenant_id, started_at, finished_at, ok, error NULL, events
 - Given room X is deactivated, then it's hidden from the booking form and new bookings in X are rejected.
 - Given an admin removes Erik who has 3 future bookings, then the confirmation says 3 bookings will be kept, and afterwards they show as "Tidigare medlem".
 
-## F8. Activity log — `Planned`
+## F8. Activity log — `Partial`
 
 **Goal:** Members can see when bookings change, so moved or cancelled activities aren't missed.
 
