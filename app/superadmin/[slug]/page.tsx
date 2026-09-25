@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { SmtpSettingsForm } from "./smtp-settings-form";
+import { DansSeSettingsForm } from "./dans-se-settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,14 @@ export default async function TenantSettingsPage({
           klubbens egen SMTP-server.
         </p>
         <SmtpSettingsForm slug={slug} tenant={tenant} />
+      </div>
+
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-gray-900">dans.se-import</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          F5: kurser importeras från dans.se och visas skrivskyddade i schemat.
+        </p>
+        <DansSeSettingsForm slug={slug} tenant={tenant} />
       </div>
     </div>
   );

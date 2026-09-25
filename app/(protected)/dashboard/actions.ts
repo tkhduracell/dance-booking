@@ -8,6 +8,7 @@ import {
   validateBooking,
   canModifyBooking,
   type ExistingBooking,
+  type ImportedOccasion,
 } from "@/lib/bookings/validation";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -29,6 +30,26 @@ async function loadExistingBookings(
     endsAt: b.ends_at,
     title: b.title,
     status: b.status as "confirmed" | "cancelled",
+  }));
+}
+
+/** F5-R2: imported occasions all occupy the tenant's course room. */
+async function loadImportedOccasions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  courseRoomId: string | null
+): Promise<ImportedOccasion[]> {
+  if (!courseRoomId) return [];
+  const { data } = await supabase
+    .from("imported_occasions")
+    .select("starts_at, ends_at, imported_courses!inner(removed_at)")
+    .eq("tenant_id", tenantId)
+    .is("imported_courses.removed_at", null);
+
+  return (data ?? []).map((occ) => ({
+    roomId: courseRoomId,
+    startsAt: occ.starts_at,
+    endsAt: occ.ends_at,
   }));
 }
 
@@ -72,17 +93,22 @@ export async function createBooking(input: {
 
   const { data: tenantRow } = await supabase
     .from("tenants")
-    .select("max_days_ahead")
+    .select("max_days_ahead, course_room_id")
     .eq("id", tenant.id)
     .single();
   const maxDaysAhead = tenantRow?.max_days_ahead ?? 90;
 
   const existing = await loadExistingBookings(supabase, tenant.id);
+  const importedOccasions = await loadImportedOccasions(
+    supabase,
+    tenant.id,
+    tenantRow?.course_room_id ?? null
+  );
 
   const result = validateBooking(input, {
     maxDaysAhead,
     existingBookings: existing,
-    importedOccasions: [], // F5 not yet implemented
+    importedOccasions,
   });
   if (!result.ok) return result;
 
@@ -152,17 +178,22 @@ export async function updateBooking(
 
   const { data: tenantRow } = await supabase
     .from("tenants")
-    .select("max_days_ahead")
+    .select("max_days_ahead, course_room_id")
     .eq("id", tenant.id)
     .single();
   const maxDaysAhead = tenantRow?.max_days_ahead ?? 90;
 
   const existing = await loadExistingBookings(supabase, tenant.id);
+  const importedOccasions = await loadImportedOccasions(
+    supabase,
+    tenant.id,
+    tenantRow?.course_room_id ?? null
+  );
 
   const result = validateBooking(input, {
     maxDaysAhead,
     existingBookings: existing,
-    importedOccasions: [],
+    importedOccasions,
     excludeBookingId: bookingId,
   });
   if (!result.ok) return result;
@@ -176,6 +207,9 @@ export async function updateBooking(
       starts_at: input.startsAt,
       ends_at: input.endsAt,
       updated_at: new Date().toISOString(),
+      // F4-R10: moving a booking clears any conflict flag; a new one is
+      // recomputed by the next sync if it still overlaps.
+      conflict_occasion_id: null,
     })
     .eq("id", bookingId);
 
