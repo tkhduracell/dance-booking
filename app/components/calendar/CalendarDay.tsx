@@ -5,18 +5,23 @@ type Props = {
   isToday: boolean;
   isOutside: boolean;
   blocks: CalendarBlock[];
+  onDayClick?: () => void;
+  onBlockClick?: (blockId: string) => void;
 };
 
 function formatTime(iso: string): string {
   return iso.slice(11, 16);
 }
 
-export function CalendarDay({ day, isToday, isOutside, blocks }: Props) {
+export function CalendarDay({ day, isToday, isOutside, blocks, onDayClick, onBlockClick }: Props) {
   return (
     <div
+      onClick={day !== null && onDayClick ? onDayClick : undefined}
       className={`min-h-20 border-t border-gray-warm p-1 sm:min-h-24 sm:p-2 ${
         isOutside ? "bg-card text-gray-400" : "bg-white"
-      } ${isToday ? "ring-2 ring-purple-accent ring-inset" : ""}`}
+      } ${isToday ? "ring-2 ring-purple-accent ring-inset" : ""} ${
+        day !== null && onDayClick ? "cursor-pointer hover:bg-card/60" : ""
+      }`}
     >
       {day !== null && (
         <>
@@ -31,6 +36,14 @@ export function CalendarDay({ day, isToday, isOutside, blocks }: Props) {
             {blocks.map((block) => (
               <div
                 key={block.id}
+                onClick={
+                  onBlockClick
+                    ? (e) => {
+                        e.stopPropagation();
+                        onBlockClick(block.id);
+                      }
+                    : undefined
+                }
                 className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight sm:text-xs ${
                   block.type === "course"
                     ? "bg-purple-light/20 text-purple-dark"

@@ -203,3 +203,43 @@ SELECT gen_random_uuid(), u.id, u.id::text, 'email',
   jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now()
 FROM auth.users u
 WHERE NOT EXISTS (SELECT 1 FROM auth.identities i WHERE i.user_id = u.id);
+
+-- ============================================================
+-- F4/F8: sample bookings for Gåsasteget, booked by the test booker.
+-- ============================================================
+DO $$
+DECLARE
+  gasasteget_id UUID := '00000000-0000-0000-0000-000000000001';
+  stora_id UUID := '00000000-0000-0000-0000-000000000011';
+  booker_id UUID;
+  training_cat UUID;
+  private_cat UUID;
+  booking1 UUID;
+  booking2 UUID;
+BEGIN
+  SELECT id INTO booker_id FROM auth.users WHERE email = 'booker@example.com';
+  SELECT id INTO training_cat FROM public.categories WHERE tenant_id = gasasteget_id AND name = 'Träning';
+  SELECT id INTO private_cat FROM public.categories WHERE tenant_id = gasasteget_id AND name = 'Privatlektion';
+
+  IF booker_id IS NOT NULL AND training_cat IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.bookings WHERE tenant_id = gasasteget_id) THEN
+    INSERT INTO public.bookings (tenant_id, room_id, booked_by, category_id, title, starts_at, ends_at)
+    VALUES (
+      gasasteget_id, stora_id, booker_id, training_cat, 'Träning',
+      (date_trunc('day', now()) + interval '3 days' + interval '18 hours'),
+      (date_trunc('day', now()) + interval '3 days' + interval '20 hours')
+    ) RETURNING id INTO booking1;
+
+    INSERT INTO public.bookings (tenant_id, room_id, booked_by, category_id, title, starts_at, ends_at)
+    VALUES (
+      gasasteget_id, stora_id, booker_id, private_cat, 'Privatlektion',
+      (date_trunc('day', now()) + interval '5 days' + interval '19 hours'),
+      (date_trunc('day', now()) + interval '5 days' + interval '20 hours')
+    ) RETURNING id INTO booking2;
+
+    INSERT INTO public.activity_log (tenant_id, booking_id, actor_id, type, before, after)
+    VALUES
+      (gasasteget_id, booking1, booker_id, 'created', NULL, jsonb_build_object('title', 'Träning', 'roomId', stora_id)),
+      (gasasteget_id, booking2, booker_id, 'created', NULL, jsonb_build_object('title', 'Privatlektion', 'roomId', stora_id));
+  END IF;
+END $$;
