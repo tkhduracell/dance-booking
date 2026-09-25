@@ -10,7 +10,7 @@ export default function AuthLayout({
           <h1 className="font-display text-3xl font-semibold lowercase text-white">gåsasteget</h1>
           <p className="mt-1 text-xs uppercase tracking-[0.3em] text-white/70">Bokningssystem</p>
         </div>
-        {children}
+        <div className="rounded-2xl bg-white p-6 shadow-lg">{children}</div>
       </div>
     </div>
   );
