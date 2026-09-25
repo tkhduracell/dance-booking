@@ -1,7 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTenant } from "@/lib/tenant/current";
+import { sendTenantEmail } from "@/lib/email/mailer";
+import { newAccessRequestEmail } from "@/lib/email/templates";
 
 const ALLOWED_ROLES = ["Funktionär", "Tävlingsdansare", "Annat"] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
@@ -45,6 +48,57 @@ export async function ensureAccessRequest(): Promise<void> {
     email: user.email ?? "",
     provider,
   });
+
+  // F3-R5: notify every tenant admin. Best-effort — never block signup.
+  try {
+    await notifyAdminsOfNewRequest(tenant.id, name, user.email ?? "");
+  } catch {
+    // SMTP not configured yet, or send failed — swallow, F9-R10 logs elsewhere.
+  }
+}
+
+async function notifyAdminsOfNewRequest(
+  tenantId: string,
+  requesterName: string,
+  requesterEmail: string
+): Promise<void> {
+  const admin = createAdminClient();
+
+  const { data: tenantRow } = await admin
+    .from("tenants")
+    .select("name")
+    .eq("id", tenantId)
+    .single();
+  const tenantName = tenantRow?.name ?? "din klubb";
+
+  const { data: admins } = await admin
+    .from("memberships")
+    .select("user_id, roles!inner(name)")
+    .eq("tenant_id", tenantId)
+    .eq("roles.name", "admin");
+
+  if (!admins || admins.length === 0) return;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
+  const adminUrl = `${appUrl}/admin`;
+
+  for (const m of admins) {
+    const { data: authUser } = await admin.auth.admin.getUserById(m.user_id);
+    const adminEmail = authUser?.user?.email;
+    if (!adminEmail) continue;
+
+    const { subject, html, text } = newAccessRequestEmail(
+      tenantName,
+      requesterName,
+      requesterEmail,
+      adminUrl
+    );
+    try {
+      await sendTenantEmail(tenantId, { to: adminEmail, subject, html, text });
+    } catch {
+      // one admin's send failing shouldn't block the others
+    }
+  }
 }
 
 /** F3-R2: optional community role + message, added by the user on /waiting. */

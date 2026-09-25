@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { CreateTenantForm } from "./create-tenant-form";
@@ -37,6 +38,7 @@ export default async function SuperAdminPage() {
                 <th className="pb-2 text-left font-medium text-gray-500">Slug</th>
                 <th className="pb-2 text-left font-medium text-gray-500">Domäner</th>
                 <th className="pb-2 text-left font-medium text-gray-500">Status</th>
+                <th className="pb-2 text-left font-medium text-gray-500"></th>
               </tr>
             </thead>
             <tbody>
@@ -59,6 +61,14 @@ export default async function SuperAdminPage() {
                     >
                       {t.active ? "Aktiv" : "Inaktiv"}
                     </span>
+                  </td>
+                  <td className="py-2">
+                    <Link
+                      href={`/superadmin/${t.slug}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Inställningar
+                    </Link>
                   </td>
                 </tr>
               ))}

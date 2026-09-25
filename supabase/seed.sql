@@ -61,6 +61,24 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000011' WHERE id = '00000000-0000-0000-0000-000000000001';
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000012' WHERE id = '00000000-0000-0000-0000-000000000002';
 
+-- F9-R10: both tenants' SMTP → local Supabase mail catcher (Inbucket/Mailpit),
+-- no auth needed. See supabase/config.toml [local_smtp] smtp_port.
+UPDATE public.tenants SET
+  smtp_host = '127.0.0.1',
+  smtp_port = 54325,
+  smtp_security = 'none',
+  smtp_from_name = 'Gåsasteget',
+  smtp_from_address = 'no-reply@gasasteget.localhost'
+WHERE id = '00000000-0000-0000-0000-000000000001';
+
+UPDATE public.tenants SET
+  smtp_host = '127.0.0.1',
+  smtp_port = 54325,
+  smtp_security = 'none',
+  smtp_from_name = 'Nackswinget',
+  smtp_from_address = 'no-reply@nsw.localhost'
+WHERE id = '00000000-0000-0000-0000-000000000002';
+
 -- ============================================================
 -- Local dev auth users (dev only, known passwords)
 -- super-admin: buggfille@gmail.com / devpassword123

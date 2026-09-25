@@ -114,8 +114,8 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 - F3-R2 A pending user sees only the waiting page `/waiting` on app routes: "Din förfrågan väntar på godkännande hos <klubb>", their submitted details, sign-out. They may optionally add community role ∈ {Funktionär, Tävlingsdansare, Annat (+ text)} (fixed list for all tenants) and a short message to the admin.
 - F3-R3 At most one open (pending) request per user per tenant; requests are per tenant (approval in club A gives nothing in club B).
 - F3-R4 Admin queue at `/admin`: pending requests of the tenant, oldest first, showing name, email, sign-in method, community role, message, requested-at. Actions: **Godkänn** (→ `booker` membership), **Neka** (→ denied, optional reason). Both store reviewer and time.
-- F3-R5 On a new request, email every admin of the tenant (one email each, with a link to `/admin`). `Planned`
-- F3-R6 On approve/deny, email the requester (denial includes the reason if given). `Planned`
+- F3-R5 On a new request, email every admin of the tenant (one email each, with a link to `/admin`). `Done`
+- F3-R6 On approve/deny, email the requester (denial includes the reason if given). `Done`
 - F3-R7 Denied users see the denial on `/waiting` and may request again (creates a new pending request); the admin sees earlier denials for that user.
 - F3-R8 Approved users are taken from `/waiting` to `/dashboard` on their next page load.
 - F3-R9 The public schedule `/` stays public for everyone, including pending users.
@@ -276,7 +276,7 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 - Given 25 entries, then the member view shows the 20 newest.
 - Given a visitor or pending user, then no activity log is shown and a direct query returns no rows.
 
-## F9. Super-admin & tenant settings — `Planned`
+## F9. Super-admin & tenant settings — `Partial`
 
 **Goal:** The platform owner can onboard clubs, and each club can configure its import, rooms, categories, email and look.
 
@@ -292,8 +292,8 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 - F9-R6 **General:** name, logo upload (PNG/SVG), timezone (default `Europe/Stockholm`), max days ahead for bookings (default 90).
 - F9-R7 **dans.se import:** dans.se link or org slug (e.g. `https://dans.se/nsw/` or `nsw`; the slug is extracted) and **API token (required for import)**. Saving validates by fetching the feed and showing the number of events found. "Synka nu" button, last sync status.
 - F9-R8 **Theme:** colour pickers with hex input for: primary, primary text (on primary), secondary, accent, background, surface (cards), text, muted text; plus header gradient start/end. Live preview of header, calendar, buttons and a booking chip while editing. "Återställ standard" resets to the platform default. Contrast warning (not block) when text/background pairs fall below WCAG AA 4.5:1. Applied as server-rendered CSS variables (no flash of default colours); components use the variables, not hard-coded colours. **(change)** from today's fixed palette in `globals.css`, which becomes Gåsasteget's seeded theme.
-- F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings.
-- F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them.
+- F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings. `Done` — implemented at `/superadmin/[slug]` (not yet `/admin/settings`; tenant-admin-facing route is future work).
+- F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them. `Done` for SMTP password (app-side AES-256-GCM, `SMTP_ENC_KEY`); dans.se token encryption unchanged/still plaintext.
 
 **Data model**
 ```

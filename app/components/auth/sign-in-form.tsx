@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sendMagicLink } from "@/app/(auth)/login/actions";
 
 export function SignInForm() {
   const [email, setEmail] = useState("");
@@ -31,15 +32,10 @@ export function SignInForm() {
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    const { error } = await sendMagicLink(email);
 
     if (error) {
-      setError(error.message);
+      setError(error);
     } else {
       setSent(true);
     }
