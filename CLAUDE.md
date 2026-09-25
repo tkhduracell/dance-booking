@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Gasasteget booking app: Next.js 15 (App Router, React 19, Turbopack) + Supabase auth/DB + Tailwind v4. UI text is Swedish (routes too: `/logga-in`, `/registrera`).
 
 ## Commands (pnpm 10)
-- `pnpm dev` — dev server
+- `pnpm dev` — dev server on http://localhost:4000 (`pnpm start` too)
 - `pnpm lint` / `pnpm typecheck` / `pnpm test:ci` / `pnpm build` — same order as CI (`.github/workflows/ci.yml`, Node 25)
 - `pnpm test` — vitest watch; single file: `pnpm vitest run app/page.test.tsx`; single test: add `-t "<name>"`
 - Tests: vitest + jsdom + Testing Library, `**/*.test.{ts,tsx}`, `@/` alias = repo root

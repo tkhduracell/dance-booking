@@ -1,3 +1,4 @@
+import { Logo } from "@/app/components/logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
@@ -99,9 +100,7 @@ export default async function ProtectedLayout({
       <header className="hero-gradient text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <a href="/dashboard" className="font-display text-xl font-semibold lowercase">
-              gåsasteget
-            </a>
+            <a href="/dashboard" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" /></a>
             <nav className="flex gap-4 text-sm">
               <a
                 href="/dashboard"
