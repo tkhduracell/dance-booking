@@ -46,7 +46,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 
 ---
 
-## F0. Tenancy — `Planned`
+## F0. Tenancy — `Partial`
 
 **Requirements**
 - F0-R1 Every tenant-owned row (rooms, categories, bookings, memberships, access requests, imported courses/occasions, activity log) has `tenant_id`. RLS restricts all reads/writes to rows of the tenant the user acts in; no cross-tenant leakage.

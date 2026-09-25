@@ -1,5 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  TENANT_COOKIE,
+  findTenantByDomain,
+  findTenantBySlug,
+  resolveTenantSlug,
+} from "@/lib/tenant/resolve";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -41,6 +47,38 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Resolve tenant (F0-R2/R3) and expose it via a request header + cookie.
+  if (supabaseUrl && supabaseAnonKey) {
+    const host = request.headers.get("host");
+    const queryTenant = request.nextUrl.searchParams.get("tenant");
+    const cookieTenant = request.cookies.get(TENANT_COOKIE)?.value ?? null;
+
+    const domainTenant = host ? await findTenantByDomain(supabase, host) : null;
+    // ?tenant= is ignored on registered custom domains.
+    const effectiveQueryTenant = domainTenant ? null : queryTenant;
+
+    const slug = resolveTenantSlug({
+      host,
+      domainTenantSlug: domainTenant?.slug ?? null,
+      queryTenant: effectiveQueryTenant,
+      cookieTenant,
+      defaultTenant: process.env.DEFAULT_TENANT ?? null,
+    });
+
+    const tenant = domainTenant ?? (slug ? await findTenantBySlug(supabase, slug) : null);
+
+    if (tenant) {
+      supabaseResponse.headers.set("x-tenant-id", tenant.id);
+      supabaseResponse.headers.set("x-tenant-slug", tenant.slug);
+      if (!domainTenant && effectiveQueryTenant) {
+        supabaseResponse.cookies.set(TENANT_COOKIE, tenant.slug, {
+          path: "/",
+          sameSite: "lax",
+        });
+      }
+    }
+  }
 
   // Redirect unauthenticated users from protected routes
   const isProtectedRoute =

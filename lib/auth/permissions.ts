@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentTenant } from "@/lib/tenant/current";
 import type { UserWithPermissions } from "./types";
 
 export const PERMISSIONS = {
@@ -15,8 +16,9 @@ export const PERMISSIONS = {
 export type PermissionAction = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 /**
- * Get the current authenticated user with their roles and permissions.
- * Returns null if not authenticated.
+ * Get the current authenticated user with their roles/permissions in the
+ * current tenant (resolved from the request via getCurrentTenant()).
+ * Returns null if not authenticated or no tenant is resolved.
  */
 export async function getCurrentUser(): Promise<UserWithPermissions | null> {
   const supabase = await createClient();
@@ -27,9 +29,13 @@ export async function getCurrentUser(): Promise<UserWithPermissions | null> {
 
   if (!user) return null;
 
-  // Fetch user roles
-  const { data: userRoles } = await supabase.rpc("get_user_roles", {
+  const tenant = await getCurrentTenant();
+  if (!tenant) return null;
+
+  // Fetch user roles in this tenant
+  const { data: userRoles } = await supabase.rpc("get_user_roles_in_tenant", {
     p_user_id: user.id,
+    p_tenant_id: tenant.id,
   });
 
   const roles =
@@ -37,9 +43,9 @@ export async function getCurrentUser(): Promise<UserWithPermissions | null> {
       (r) => r.role_name
     ) ?? [];
 
-  // Fetch permissions based on roles
+  // Fetch permissions based on roles in this tenant
   const { data: rolePermissions } = await supabase
-    .from("user_roles")
+    .from("memberships")
     .select(
       `
       roles:role_id (
@@ -51,12 +57,13 @@ export async function getCurrentUser(): Promise<UserWithPermissions | null> {
       )
     `
     )
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .eq("tenant_id", tenant.id);
 
   const permissions = new Set<string>();
   if (rolePermissions) {
-    for (const ur of rolePermissions) {
-      const roles = ur.roles as unknown as {
+    for (const m of rolePermissions) {
+      const roles = m.roles as unknown as {
         role_permissions: { permissions: { action: string } }[];
       };
       if (roles?.role_permissions) {
@@ -72,13 +79,14 @@ export async function getCurrentUser(): Promise<UserWithPermissions | null> {
   return {
     id: user.id,
     email: user.email ?? "",
+    tenantId: tenant.id,
     roles,
     permissions: Array.from(permissions),
   };
 }
 
 /**
- * Check if the current user has a specific permission.
+ * Check if the current user has a specific permission in the current tenant.
  */
 export async function hasPermission(action: string): Promise<boolean> {
   const user = await getCurrentUser();
@@ -97,7 +105,7 @@ export async function requirePermission(action: string): Promise<void> {
 }
 
 /**
- * Check if the current user has a specific role.
+ * Check if the current user has a specific role in the current tenant.
  */
 export async function hasRole(roleName: string): Promise<boolean> {
   const user = await getCurrentUser();

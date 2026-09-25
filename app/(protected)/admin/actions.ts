@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/permissions";
+import { getCurrentTenant } from "@/lib/tenant/current";
 
 export async function approveRequest(
   requestId: string,
@@ -11,6 +12,8 @@ export async function approveRequest(
   await requireRole("admin");
 
   const supabase = await createClient();
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Ingen klubb hittades." };
 
   const {
     data: { user: adminUser },
@@ -27,14 +30,15 @@ export async function approveRequest(
     return { error: "Booker-rollen hittades inte." };
   }
 
-  // Assign booker role to user
-  const { error: roleError } = await supabase.from("user_roles").upsert(
+  // Assign booker membership in this tenant
+  const { error: roleError } = await supabase.from("memberships").upsert(
     {
       user_id: userId,
+      tenant_id: tenant.id,
       role_id: bookerRole.id,
       assigned_by: adminUser?.id,
     },
-    { onConflict: "user_id,role_id" }
+    { onConflict: "user_id,tenant_id" }
   );
 
   if (roleError) {
