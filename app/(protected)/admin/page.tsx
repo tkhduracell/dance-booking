@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { PendingRequestsList } from "./pending-requests-list";
 import type { AccessRequest } from "@/lib/auth/types";
+import { getCurrentTenant } from "@/lib/tenant/current";
 
 export const dynamic = "force-dynamic";
 
@@ -10,42 +11,51 @@ export const metadata = {
 
 export default async function AdminPage() {
   const supabase = await createClient();
+  const tenant = await getCurrentTenant();
 
-  // Fetch pending access requests
-  const { data: pendingRequests } = await supabase
-    .from("access_requests")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
+  // Fetch pending access requests for this tenant
+  const { data: pendingRequests } = tenant
+    ? await supabase
+        .from("access_requests")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: true })
+    : { data: null };
 
-  // Fetch all users with their roles
-  const { data: userRoles } = await supabase.from("user_roles").select(`
+  // Fetch all members of this tenant with their roles
+  const { data: memberships } = tenant
+    ? await supabase.from("memberships").select(`
     user_id,
     roles:role_id (
       name
     )
-  `);
+  `).eq("tenant_id", tenant.id)
+    : { data: null };
 
   // Group roles by user_id
   const userRoleMap = new Map<string, string[]>();
-  if (userRoles) {
-    for (const ur of userRoles) {
-      const existing = userRoleMap.get(ur.user_id) ?? [];
-      const roleName = (ur.roles as unknown as { name: string })?.name;
+  if (memberships) {
+    for (const m of memberships) {
+      const existing = userRoleMap.get(m.user_id) ?? [];
+      const roleName = (m.roles as unknown as { name: string })?.name;
       if (roleName) {
         existing.push(roleName);
       }
-      userRoleMap.set(ur.user_id, existing);
+      userRoleMap.set(m.user_id, existing);
     }
   }
 
   // Fetch recently reviewed requests for context
-  const { data: recentReviewed } = await supabase
-    .from("access_requests")
-    .select("*")
-    .neq("status", "pending")
-    .order("reviewed_at", { ascending: false })
-    .limit(10);
+  const { data: recentReviewed } = tenant
+    ? await supabase
+        .from("access_requests")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .neq("status", "pending")
+        .order("reviewed_at", { ascending: false })
+        .limit(10)
+    : { data: null };
 
   return (
     <div>

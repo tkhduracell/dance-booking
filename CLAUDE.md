@@ -12,14 +12,18 @@ Gasasteget booking app: Next.js 15 (App Router, React 19, Turbopack) + Supabase 
 - `pnpm lint` / `pnpm typecheck` / `pnpm test:ci` / `pnpm build` — same order as CI (`.github/workflows/ci.yml`, Node 25)
 - `pnpm test` — vitest watch; single file: `pnpm vitest run app/page.test.tsx`; single test: add `-t "<name>"`
 - Tests: vitest + jsdom + Testing Library, `**/*.test.{ts,tsx}`, `@/` alias = repo root
+- `pnpm db:start` / `pnpm db:stop` — local Supabase via Docker (Supabase CLI)
+- `pnpm db:reset` — recreate the local DB, apply `supabase/migrations/*.sql`, then `supabase/seed.sql`
+- `pnpm db:types` — regenerate `lib/supabase/database.types.ts` from the local DB
 
 ## Env
-See `.env.example`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Without Supabase vars, middleware skips auth entirely (app still runs).
+See `.env.example`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (from `supabase status` for local dev), `DEFAULT_TENANT` (F0-R3 fallback, e.g. `gasasteget`). Without Supabase vars, middleware skips auth entirely (app still runs).
 
 ## Architecture
-- `middleware.ts` → `lib/supabase/middleware.ts`: refreshes session; redirects unauthenticated users off `/dashboard`, `/admin` to `/logga-in`, and authenticated users off auth pages to `/dashboard`.
+- `middleware.ts` → `lib/supabase/middleware.ts`: refreshes session; resolves the current tenant (F0, `lib/tenant/resolve.ts`) from `Host` → `tenant_domains`, else `?tenant=`, else a `tenant` cookie, else `DEFAULT_TENANT`; exposes it via `x-tenant-id`/`x-tenant-slug` response headers (read server-side with `lib/tenant/current.ts`'s `getCurrentTenant()`). Also redirects unauthenticated users off `/dashboard`, `/admin` to `/logga-in`, and authenticated users off auth pages to `/dashboard`.
 - Route groups: `app/(auth)` (login/signup/OAuth callback), `app/(protected)` (dashboard, admin). Server actions live in `actions.ts` next to routes.
 - Supabase clients: `lib/supabase/{client,server,admin}.ts` — browser, server (cookies), service-role (bypasses RLS; server only).
-- RBAC: schema in `supabase/seed.sql` (roles, permissions, role_permissions, user_roles, access_requests; run manually in Supabase SQL editor — no migrations tool). `lib/auth/permissions.ts` has `PERMISSIONS`, `getCurrentUser`, `requirePermission`/`requireRole` (redirect to `/dashboard` on deny). Server actions must guard themselves with these.
-- Access flow: user signs up → submits access request → admin approves in `/admin` → assigned `booker` role.
+- Multi-tenancy (F0): schema in `supabase/migrations/*.sql` (Supabase CLI migrations, applied via `pnpm db:reset`/on deploy — not manual SQL editor edits). Core tables: `tenants`, `tenant_domains`, `rooms`, `platform_admins`, plus data-driven `roles`/`permissions`/`role_permissions` and per-tenant `memberships(user_id, tenant_id, role_id)` (replaces the old global `user_roles`) and per-tenant `access_requests`. RLS enforces tenant scoping on every tenant-owned table. `lib/auth/permissions.ts` has `PERMISSIONS`, `getCurrentUser`/`hasPermission`/`hasRole` (tenant-scoped via `getCurrentTenant()`), `requirePermission`/`requireRole` (redirect to `/dashboard` on deny). Server actions must guard themselves with these.
+- `supabase/seed.sql` is local dev-only seed data (not schema): platform admin, demo tenants Gåsasteget/Nackswinget with a room each, and local test auth users — see README "Local development".
+- Access flow: user signs up → submits access request (per tenant) → admin approves in `/admin` → assigned `booker` membership in that tenant.
 - Calendar (start page `app/page.tsx`): `app/components/calendar/`. `dans-api.ts` is a server action scraping dans.se JSON `htmlBlock` via regex (revalidate 300s) into `CalendarBlock`s; `mock-data.ts` supplies other blocks.
