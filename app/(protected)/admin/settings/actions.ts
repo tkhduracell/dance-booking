@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current";
 import { isValidHex } from "@/lib/tenant/theme";
+import { LOGO_MAX_BYTES, LOGO_MIME_EXT, hasValidMagicBytes } from "@/lib/tenant/logo";
 import {
   saveSmtpSettingsForTenant,
   sendSmtpTestEmailForTenant,
@@ -96,38 +98,9 @@ export async function saveGeneralSettings(
   return { message: "Allmänna inställningar sparade." };
 }
 
-const LOGO_MAX_BYTES = 1024 * 1024;
-const LOGO_MIME_EXT: Record<string, string> = {
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-/** Verify the file's magic bytes match its declared MIME type — SVG is
- * deliberately unsupported (stored-XSS risk via inline <script>/on* attrs),
- * and file.type alone is client-supplied and not trustworthy. */
-function hasValidMagicBytes(bytes: Uint8Array, mimeType: string): boolean {
-  if (mimeType === "image/png") {
-    const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    return PNG_SIG.every((b, i) => bytes[i] === b);
-  }
-  if (mimeType === "image/webp") {
-    // "RIFF" .... "WEBP"
-    return (
-      bytes[0] === 0x52 &&
-      bytes[1] === 0x49 &&
-      bytes[2] === 0x46 &&
-      bytes[3] === 0x46 &&
-      bytes[8] === 0x57 &&
-      bytes[9] === 0x45 &&
-      bytes[10] === 0x42 &&
-      bytes[11] === 0x50
-    );
-  }
-  return false;
-}
-
-/** F9-R6: upload a tenant logo (png/webp, ≤1MB) to the `tenant-logos`
- * bucket under the tenant's own folder, and point tenants.logo_path at it. */
+/** F9-R6: upload a tenant logo (png/webp, ≤1MB), stored directly in
+ * tenants.logo_data via the service-role client (bypasses RLS so the
+ * write isn't gated on a tenants UPDATE policy covering this column). */
 export async function uploadTenantLogo(
   formData: FormData
 ): Promise<{ error?: string; message?: string }> {
@@ -147,15 +120,15 @@ export async function uploadTenantLogo(
     return { error: "Filens innehåll matchar inte filtypen." };
   }
 
-  const supabase = await createClient();
-  const path = `${tenant.id}/logo.${ext}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("tenant-logos")
-    .upload(path, buffer, { upsert: true, contentType: file.type });
-  if (uploadError) return { error: uploadError.message };
-
-  const { error } = await supabase.from("tenants").update({ logo_path: path }).eq("id", tenant.id);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tenants")
+    .update({
+      logo_data: "\\x" + Buffer.from(buffer).toString("hex"),
+      logo_mime: file.type,
+      logo_updated_at: new Date().toISOString(),
+    })
+    .eq("id", tenant.id);
   if (error) return { error: error.message };
 
   revalidatePath("/admin/settings");
@@ -167,44 +140,15 @@ export async function removeTenantLogo(): Promise<{ error?: string; message?: st
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Ingen klubb hittades." };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("tenants").update({ logo_path: null }).eq("id", tenant.id);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tenants")
+    .update({ logo_data: null, logo_mime: null, logo_updated_at: new Date().toISOString() })
+    .eq("id", tenant.id);
   if (error) return { error: error.message };
 
   revalidatePath("/admin/settings");
   return { message: "Logotyp borttagen." };
-}
-
-// ---------- F9-R8: background gradient ----------
-export async function saveBackgroundGradient(
-  formData: FormData
-): Promise<{ error?: string; message?: string }> {
-  await requireRole("admin");
-  const tenant = await getCurrentTenant();
-  if (!tenant) return { error: "Ingen klubb hittades." };
-
-  const from = (formData.get("bg_gradient_from") as string | null)?.trim() ?? "";
-  const via = (formData.get("bg_gradient_via") as string | null)?.trim() ?? "";
-  const to = (formData.get("bg_gradient_to") as string | null)?.trim() ?? "";
-
-  if (!from || !isValidHex(from)) return { error: "Ogiltig hex-färg för start." };
-  if (via && !isValidHex(via)) return { error: "Ogiltig hex-färg för mitten." };
-  if (to && !isValidHex(to)) return { error: "Ogiltig hex-färg för slut." };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("tenants")
-    .update({
-      bg_gradient_from: from,
-      bg_gradient_via: via || null,
-      bg_gradient_to: to || null,
-    })
-    .eq("id", tenant.id);
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/admin/settings");
-  return { message: "Bakgrund sparad." };
 }
 
 // ---------- F9-R8: theme ----------
@@ -221,44 +165,82 @@ export type ThemeInput = {
   headerTo: string;
 };
 
-export async function saveThemeSettings(
+/** F9-R8: unified theme panel — saves primary/secondary/text + gradient in
+ * one action. Other theme keys (onPrimary/accent/background/surface/
+ * mutedText/headerFrom/headerTo) are left as previously saved. */
+export async function saveUnifiedTheme(
   formData: FormData
 ): Promise<{ error?: string; message?: string }> {
   await requireRole("admin");
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Ingen klubb hittades." };
 
-  const fields: (keyof ThemeInput)[] = [
-    "primary",
-    "onPrimary",
-    "secondary",
-    "accent",
-    "background",
-    "surface",
-    "text",
-    "mutedText",
-    "headerFrom",
-    "headerTo",
-  ];
-  const theme: Partial<ThemeInput> = {};
-  for (const f of fields) {
-    const v = (formData.get(f) as string | null)?.trim() ?? "";
-    if (v && !isValidHex(v)) {
-      return { error: `Ogiltig hex-färg för ${f}.` };
-    }
-    if (v) theme[f] = v;
+  const primary = (formData.get("primary") as string | null)?.trim() ?? "";
+  const secondary = (formData.get("secondary") as string | null)?.trim() ?? "";
+  const text = (formData.get("text") as string | null)?.trim() ?? "";
+  const from = (formData.get("bg_gradient_from") as string | null)?.trim() ?? "";
+  const via = (formData.get("bg_gradient_via") as string | null)?.trim() ?? "";
+  const to = (formData.get("bg_gradient_to") as string | null)?.trim() ?? "";
+
+  for (const [label, v] of [
+    ["Primär", primary],
+    ["Sekundär", secondary],
+    ["Text", text],
+  ] as const) {
+    if (!v || !isValidHex(v)) return { error: `Ogiltig hex-färg för ${label}.` };
   }
+  if (!from || !isValidHex(from)) return { error: "Ogiltig hex-färg för gradient start." };
+  if (via && !isValidHex(via)) return { error: "Ogiltig hex-färg för gradient mitten." };
+  if (to && !isValidHex(to)) return { error: "Ogiltig hex-färg för gradient slut." };
 
   const supabase = await createClient();
+
+  const { data: current } = await supabase
+    .from("tenants")
+    .select("theme")
+    .eq("id", tenant.id)
+    .single();
+  const existingTheme = (current?.theme as Record<string, string> | null) ?? {};
+
+  const theme = { ...existingTheme, primary, secondary, text };
+
   const { error } = await supabase
     .from("tenants")
-    .update({ theme })
+    .update({
+      theme,
+      bg_gradient_from: from,
+      bg_gradient_via: via || null,
+      bg_gradient_to: to || null,
+    })
     .eq("id", tenant.id);
 
   if (error) return { error: error.message };
 
   revalidatePath("/admin/settings");
   return { message: "Tema sparat." };
+}
+
+/** F9-R8: reset theme + gradient to the default Gåsasteget look. */
+export async function resetTenantTheme(): Promise<{ error?: string; message?: string }> {
+  await requireRole("admin");
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Ingen klubb hittades." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tenants")
+    .update({
+      theme: null,
+      bg_gradient_from: null,
+      bg_gradient_via: null,
+      bg_gradient_to: null,
+    })
+    .eq("id", tenant.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/settings");
+  return { message: "Tema återställt till standard." };
 }
 
 // ---------- F9-R4: rooms ----------

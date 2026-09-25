@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveGeneralSettings,
-  saveThemeSettings,
   uploadTenantLogo,
   removeTenantLogo,
-  saveBackgroundGradient,
+  saveUnifiedTheme,
+  resetTenantTheme,
 } from "./actions";
-import { buildTenantBackground } from "@/lib/tenant/theme";
+import { buildTenantBackground, isValidHex } from "@/lib/tenant/theme";
 
 type Tenant = {
   name: string;
@@ -59,58 +59,6 @@ export function GeneralSettingsForm({ tenant }: { tenant: Tenant }) {
         className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
       >
         Spara
-      </button>
-    </form>
-  );
-}
-
-const THEME_FIELDS: { key: string; label: string }[] = [
-  { key: "primary", label: "Primär" },
-  { key: "onPrimary", label: "Text på primär" },
-  { key: "secondary", label: "Sekundär" },
-  { key: "accent", label: "Accent" },
-  { key: "background", label: "Bakgrund" },
-  { key: "surface", label: "Yta (kort)" },
-  { key: "text", label: "Text" },
-  { key: "mutedText", label: "Dämpad text" },
-  { key: "headerFrom", label: "Header-gradient start" },
-  { key: "headerTo", label: "Header-gradient slut" },
-];
-
-export function ThemeSettingsForm({ theme }: { theme: Record<string, string> | null }) {
-  const [msg, setMsg] = useState<string | null>(null);
-  const router = useRouter();
-
-  async function handleSubmit(formData: FormData) {
-    const result = await saveThemeSettings(formData);
-    setMsg(result.error ? `Fel: ${result.error}` : result.message ?? null);
-    router.refresh();
-  }
-
-  return (
-    <form action={handleSubmit} className="mt-4 space-y-3">
-      {msg && <div className="rounded-md bg-gray-50 p-2 text-sm text-gray-700">{msg}</div>}
-      <p className="text-xs text-gray-500">
-        Ingen live-förhandsvisning eller kontrastvarning ännu (simplifiering).
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {THEME_FIELDS.map((f) => (
-          <label key={f.key} className="flex flex-col gap-1 text-xs text-gray-600">
-            {f.label}
-            <input
-              name={f.key}
-              type="color"
-              defaultValue={theme?.[f.key] ?? "#0B6E4F"}
-              className="h-9 w-full rounded-md border border-gray-300"
-            />
-          </label>
-        ))}
-      </div>
-      <button
-        type="submit"
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-      >
-        Spara tema
       </button>
     </form>
   );
@@ -175,81 +123,250 @@ export function LogoUploadForm({ logoUrl }: { logoUrl: string | null }) {
   );
 }
 
-// ---------- F9-R8: background gradient ----------
+// ---------- F9-R8: unified theme panel ----------
 type BgGradient = {
   bg_gradient_from: string | null;
   bg_gradient_via: string | null;
   bg_gradient_to: string | null;
 };
 
-export function BackgroundGradientForm({ gradient }: { gradient: BgGradient }) {
+type ThemeState = {
+  primary: string;
+  secondary: string;
+  text: string;
+  bg_gradient_from: string;
+  bg_gradient_via: string;
+  bg_gradient_to: string;
+};
+
+export const DEFAULT_THEME_STATE: ThemeState = {
+  primary: "#4c4a82",
+  secondary: "#7a4a82",
+  text: "#1f2937",
+  bg_gradient_from: "#2d284d",
+  bg_gradient_via: "#4b4280",
+  bg_gradient_to: "#9e97c4",
+};
+
+export const PRESETS: { name: string; values: ThemeState }[] = [
+  { name: "Gåsasteget lila", values: DEFAULT_THEME_STATE },
+  {
+    name: "Turkos",
+    values: {
+      primary: "#0f766e",
+      secondary: "#0891b2",
+      text: "#0f172a",
+      bg_gradient_from: "#134e4a",
+      bg_gradient_via: "#0e7490",
+      bg_gradient_to: "#5eead4",
+    },
+  },
+  {
+    name: "Skog",
+    values: {
+      primary: "#166534",
+      secondary: "#4d7c0f",
+      text: "#14532d",
+      bg_gradient_from: "#14532d",
+      bg_gradient_via: "#3f6212",
+      bg_gradient_to: "#a3e635",
+    },
+  },
+  {
+    name: "Solnedgång",
+    values: {
+      primary: "#c2410c",
+      secondary: "#db2777",
+      text: "#431407",
+      bg_gradient_from: "#7c2d12",
+      bg_gradient_via: "#c2410c",
+      bg_gradient_to: "#fbbf24",
+    },
+  },
+];
+
+function ColorField({
+  label,
+  name,
+  value,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const valid = isValidHex(value);
+  return (
+    <label className="flex flex-col gap-1 text-xs text-gray-600">
+      {label}
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={valid ? value : "#000000"}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-9 shrink-0 rounded-md border border-gray-300 p-0.5"
+          aria-label={`${label} – färgväljare`}
+        />
+        <input
+          name={name}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#000000"
+          className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm shadow-sm ${
+            valid ? "border-gray-300" : "border-red-400"
+          }`}
+        />
+      </div>
+    </label>
+  );
+}
+
+export function TenantThemePanel({
+  theme,
+  gradient,
+  logoUrl,
+  tenantName,
+}: {
+  theme: Record<string, string> | null;
+  gradient: BgGradient;
+  logoUrl: string | null;
+  tenantName: string;
+}) {
   const [msg, setMsg] = useState<string | null>(null);
-  const [from, setFrom] = useState(gradient.bg_gradient_from ?? "#2d284d");
-  const [via, setVia] = useState(gradient.bg_gradient_via ?? "#4b4280");
-  const [to, setTo] = useState(gradient.bg_gradient_to ?? "#9e97c4");
+  const [state, setState] = useState<ThemeState>({
+    primary: theme?.primary ?? DEFAULT_THEME_STATE.primary,
+    secondary: theme?.secondary ?? DEFAULT_THEME_STATE.secondary,
+    text: theme?.text ?? DEFAULT_THEME_STATE.text,
+    bg_gradient_from: gradient.bg_gradient_from ?? DEFAULT_THEME_STATE.bg_gradient_from,
+    bg_gradient_via: gradient.bg_gradient_via ?? DEFAULT_THEME_STATE.bg_gradient_via,
+    bg_gradient_to: gradient.bg_gradient_to ?? DEFAULT_THEME_STATE.bg_gradient_to,
+  });
   const router = useRouter();
 
+  function set<K extends keyof ThemeState>(key: K, v: string) {
+    setState((s) => ({ ...s, [key]: v }));
+  }
+
   async function handleSubmit(formData: FormData) {
-    const result = await saveBackgroundGradient(formData);
+    const result = await saveUnifiedTheme(formData);
+    setMsg(result.error ? `Fel: ${result.error}` : result.message ?? null);
+    router.refresh();
+  }
+
+  async function handleReset() {
+    setState(DEFAULT_THEME_STATE);
+    const result = await resetTenantTheme();
     setMsg(result.error ? `Fel: ${result.error}` : result.message ?? null);
     router.refresh();
   }
 
   const preview = buildTenantBackground({
-    bg_gradient_from: from,
-    bg_gradient_via: via,
-    bg_gradient_to: to,
+    bg_gradient_from: state.bg_gradient_from,
+    bg_gradient_via: state.bg_gradient_via,
+    bg_gradient_to: state.bg_gradient_to,
   });
 
   return (
-    <form action={handleSubmit} className="mt-4 space-y-3">
+    <form action={handleSubmit} className="mt-4 space-y-4">
       {msg && <div className="rounded-md bg-gray-50 p-2 text-sm text-gray-700">{msg}</div>}
-      <div
-        className="h-16 w-full rounded-md border border-gray-200"
-        style={{ background: preview }}
-        aria-label="Förhandsvisning av bakgrund"
-      />
-      <div className="grid grid-cols-3 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-gray-600">
-          Start
-          <input
-            name="bg_gradient_from"
-            type="color"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-9 w-full rounded-md border border-gray-300"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-600">
-          Mitten (valfritt)
-          <input
-            name="bg_gradient_via"
-            type="color"
-            value={via}
-            onChange={(e) => setVia(e.target.value)}
-            className="h-9 w-full rounded-md border border-gray-300"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-600">
-          Slut (valfritt)
-          <input
-            name="bg_gradient_to"
-            type="color"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-9 w-full rounded-md border border-gray-300"
-          />
-        </label>
+
+      <div>
+        <p className="mb-2 text-xs font-medium text-gray-600">Förinställda paletter</p>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => setState(p.values)}
+              className="flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              <span
+                className="h-4 w-4 rounded-full border border-black/10"
+                style={{
+                  background: `linear-gradient(135deg, ${p.values.primary}, ${p.values.secondary})`,
+                }}
+              />
+              {p.name}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="text-xs text-gray-500">
-        Bara start ifylld ger en enfärgad bakgrund. Standard är Gåsastegets lila gradient.
-      </p>
-      <button
-        type="submit"
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-      >
-        Spara bakgrund
-      </button>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ColorField
+          label="Primär"
+          name="primary"
+          value={state.primary}
+          onChange={(v) => set("primary", v)}
+        />
+        <ColorField
+          label="Sekundär"
+          name="secondary"
+          value={state.secondary}
+          onChange={(v) => set("secondary", v)}
+        />
+        <ColorField label="Text" name="text" value={state.text} onChange={(v) => set("text", v)} />
+        <ColorField
+          label="Gradient start"
+          name="bg_gradient_from"
+          value={state.bg_gradient_from}
+          onChange={(v) => set("bg_gradient_from", v)}
+        />
+        <ColorField
+          label="Gradient mitten"
+          name="bg_gradient_via"
+          value={state.bg_gradient_via}
+          onChange={(v) => set("bg_gradient_via", v)}
+        />
+        <ColorField
+          label="Gradient slut"
+          name="bg_gradient_to"
+          value={state.bg_gradient_to}
+          onChange={(v) => set("bg_gradient_to", v)}
+        />
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-medium text-gray-600">Förhandsvisning</p>
+        <div
+          className="flex h-28 flex-col justify-between rounded-lg p-4 shadow-sm"
+          style={{ background: preview }}
+        >
+          <div className="flex items-center gap-2">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="Logotyp" className="h-8 max-w-24 object-contain" />
+            ) : (
+              <span className="text-sm font-semibold text-white">{tenantName}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="w-fit rounded-md px-3 py-1.5 text-sm font-medium shadow-sm"
+            style={{ background: state.primary, color: "#fff" }}
+          >
+            Boka nu
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+        >
+          Spara tema
+        </button>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          Återställ standard
+        </button>
+      </div>
     </form>
   );
 }
