@@ -51,7 +51,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 **Requirements**
 - F0-R1 Every tenant-owned row (rooms, categories, bookings, memberships, access requests, imported courses/occasions, activity log) has `tenant_id`. RLS restricts all reads/writes to rows of the tenant the user acts in; no cross-tenant leakage.
 - F0-R2 The current tenant is resolved per request from the `Host` header via `tenant_domains(domain → tenant_id)`.
-- F0-R3 Fallback when the host is not a registered domain (localhost, `*.vercel.app` previews): `?tenant=<slug>` query param (stored in a cookie for the session), else env `DEFAULT_TENANT`. `?tenant=` is ignored on registered custom domains. When the tenant comes only from `DEFAULT_TENANT` (no domain, param or cookie), auth pages render neutral (unbranded "Dansbokning"); in production every tenant is served on its own subdomain, so this only affects localhost/previews. The super-admin signs in at the always-neutral `/platform/login` (unauthenticated `/superadmin` redirects there) and lands on `/superadmin`. Post-login `next` targets must be same-origin paths.
+- F0-R3 Fallback when the host is not a registered domain (localhost, `*.vercel.app` previews): `?tenant=<slug>` query param (stored in a cookie for the session), else env `DEFAULT_TENANT`. `?tenant=` is ignored on registered custom domains. When the tenant comes only from `DEFAULT_TENANT` (no domain, param or cookie), auth pages render neutral (unbranded "Dansbokning"); in production every tenant is served on its own subdomain, so this only affects localhost/previews. The super-admin signs in at the always-neutral `/login` (unauthenticated `/admin/tenants` redirects there) and lands on `/admin/tenants`. Post-login `next` targets must be same-origin paths.
 - F0-R4 Unknown host with no fallback → 404 page "Klubben hittades inte".
 - F0-R5 Tenant settings are defined in F9.
 - F0-R6 Branding: the UI uses the tenant's logo and colours; Gåsasteget's current theme becomes its tenant settings **(change)**.
@@ -64,7 +64,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 - Given a user who is admin in A and has no membership in B, when they open B's `/admin`, then access is denied.
 - Given a crafted request inserting a booking with B's `tenant_id` while acting in A, then RLS rejects it.
 - Given `localhost:4000/?tenant=gasasteget`, then Gåsasteget is resolved; given `DEFAULT_TENANT=gasasteget` and no param, then Gåsasteget too.
-- Given a user who was `booker` before the migration, then after it they are booker in Gåsasteget and land on `/dashboard`.
+- Given a user who was `booker` before the migration, then after it they are booker in Gåsasteget and land on `/`.
 
 ## F1. Public schedule — `Partial`
 
@@ -90,11 +90,11 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 
 **Requirements**
 - F2-R1 Sign-in methods: **email magic link / one-time code**, Google, Facebook, Microsoft (Outlook/Azure, personal + work accounts). All via Supabase Auth. **(change)** replaces email+password.
-- F2-R2 One page `/login` offers all methods; there is no separate sign-up (`/register` redirects to `/login`). First sign-in creates the account. **(change)**
+- F2-R2 One page `/login` offers all methods; there is no separate sign-up page. First sign-in creates the account. **(change)**
 - F2-R3 **Magic-link emails are sent by the app through the tenant's own SMTP (F9-R10)**, not by Supabase's mailer: the server generates the link/code with the Supabase admin API (`auth.admin.generateLink`), renders a Swedish email with the tenant's name and branding, and sends it. Supabase's built-in email sending is not used.
 - F2-R4 Accounts are global (one person, one account across tenants). Signing in with a provider whose verified email matches an existing account links to that account (Supabase identity linking). Q-25
 - F2-R5 After sign-in the user returns to the tenant domain and page they started from. **(change, F0)**
-- F2-R6 Unauthenticated access to app routes (`/dashboard`, `/admin`, booking pages) redirects to `/login?next=<path>`; signed-in users on `/login` go to `/dashboard`.
+- F2-R6 Unauthenticated access to app routes (`/`, `/admin`, booking pages) redirects to `/login?next=<path>`; signed-in users on `/login` go to `/`.
 - F2-R7 Sign-out available everywhere when signed in, including the waiting page.
 - F2-R8 `Done` A member can **delete their own account** (user menu → confirm). Effects: memberships and pending requests removed in all tenants; bookings (future and past) are kept and shown as "Tidigare medlem"; activity log entries keep their text with the actor shown as "Tidigare medlem" (via `ON DELETE SET NULL` on `booked_by`/`actor_id`); the auth user is deleted (`deleteOwnAccount` server action, "Ta bort konto" in the user menu with a `confirm()` dialog).
 
@@ -102,7 +102,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 - Given a new person enters their email on `boka.nackswinget.se`, then they receive an email sent via Nackswinget's SMTP with a link/code; using it signs them in and creates their account.
 - Given a user signs in with Google on `boka.b.se`, then they end up on `boka.b.se` (not another tenant's domain).
 - Given a person first used Google and later the magic link with the same email, then it's the same account.
-- Given `/register`, then the user is redirected to `/login`.
+- Given `/register`, then it does not exist (404).
 - Given Anna deletes her account, then her future booking still blocks its slot, shows "Tidigare medlem" to members, and can only be changed by an admin.
 
 ## F3. Approval queue — `Partial`
@@ -117,7 +117,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 - F3-R5 On a new request, email every admin of the tenant (one email each, with a link to `/admin`). `Done`
 - F3-R6 On approve/deny, email the requester (denial includes the reason if given). `Done`
 - F3-R7 Denied users see the denial on `/waiting` and may request again (creates a new pending request); the admin sees earlier denials for that user.
-- F3-R8 Approved users are taken from `/waiting` to `/dashboard` on their next page load.
+- F3-R8 Approved users are taken from `/waiting` to `/` on their next page load.
 - F3-R9 The public schedule `/` stays public for everyone, including pending users.
 - F3-R10 The display name shown on bookings is the name from the approved request; the member can edit it in their profile.
 
@@ -132,9 +132,9 @@ profiles(user_id PK, display_name)
 
 **Acceptance criteria**
 - Given a new user signs in with Facebook on Gåsasteget's domain, then a pending request exists for Gåsasteget with their Facebook name and email, and they land on `/waiting`.
-- Given a pending user opens `/dashboard`, then they are redirected to `/waiting`.
+- Given a pending user opens `/`, then they are redirected to `/waiting`.
 - Given a pending user signs in again, then no second request is created.
-- Given an admin of Gåsasteget approves, then the user is booker in Gåsasteget only, gets an approval email, and their next load goes to `/dashboard`.
+- Given an admin of Gåsasteget approves, then the user is booker in Gåsasteget only, gets an approval email, and their next load goes to `/`.
 - Given an admin denies with reason "Okänd", then the user sees the denial and reason on `/waiting` and can request again.
 - Given a new request, then each admin of that tenant (and nobody else) receives one email.
 - Given a non-admin calls the approve action, then nothing changes.
@@ -198,7 +198,7 @@ Overlap with imported occasions is checked in application code (in the same tran
 - F5-R4 `Done` **Conflicts:** when a sync adds/changes occasions that overlap existing confirmed bookings in the course room, those bookings keep their slot and get a conflict flag (F4-R10); the booker is emailed (F4-R11) and admins see the conflicts in the admin view (`/admin/courses`, `/admin/bookings`). The sync is never blocked by bookings.
 - F5-R5 `Planned` If the tenant has no course room set, courses show on the schedule marked "Lokal ej vald" and block nothing. Not built this pass (no course room → no imported occasions shown at all, which is safe but not the exact UX).
 - F5-R6 `Done` Imported courses and occasions cannot be created, edited, moved or cancelled in this system; the UI links to `source` on dans.se instead. Calendar renders them read-only (clicks on imported blocks are a no-op); "link to source" not yet in the UI.
-- F5-R7 `Done` If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>" on `/superadmin/[slug]` and on `/admin/settings`.
+- F5-R7 `Done` If the sync fails (network, 5xx, invalid token), the last synced data stays in use; admins see "Senaste synk misslyckades <time>: <reason>" on `/admin/tenants/[slug]` and on `/admin/settings`.
 - F5-R8 `Done` dans.se changes are **not** written to the activity log.
 - F5-R9 `Done` Parsing is covered by fixture tests with recorded API responses (with personal data stripped from fixtures): `lib/dans-se/client.test.ts`, `lib/dans-se/__fixtures__/events.json`.
 
@@ -224,7 +224,7 @@ dans_se_sync_runs(id, tenant_id, started_at, finished_at, ok, error NULL, events
 **Goal:** Once signed in to a club, members land directly in the calendar and can book from there.
 
 **Requirements**
-- F6-R1 Approved members (booker/admin) land on `/dashboard` **(change)**, which is the calendar view (replaces the current profile-only page).
+- F6-R1 Approved members (booker/admin) land on `/` **(change)**, which is the calendar view (replaces the current profile-only page).
 - F6-R2 Layout: header (tenant logo, user menu with profile/sign-out/delete account, Admin link for admins) · **left sidebar with the tenant's rooms** · **main area: calendar**.
 - F6-R3 Sidebar "Lokaler" lists the tenant's active rooms (in `sort_order`), plus "Alla lokaler" (default). Selecting a room filters the calendar to that room's bookings (and imported courses if it's the course room). The selection is reflected in the URL (`?room=<id>`) so it survives reloads and can be shared.
 - F6-R4 Calendar: **month and week** (week with time axis). Default: week on desktop, month on mobile. Items show time, title, category colour and the booker's name; own bookings and conflict-flagged bookings are highlighted.
@@ -282,18 +282,18 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 
 **Super-admin**
 - F9-R1 Super-admins are listed in `platform_admins(email)`, seeded by migration with `buggfille@gmail.com`. A user whose verified email is in that table is super-admin; no UI to grant it.
-- F9-R2 `/superadmin` (super-admins only): list tenants (name, domains, #members, #pending requests, last dans.se sync, SMTP status); create tenant (name, slug, first domain); edit/deactivate tenant; manage domains (UI reminds that the domain must be added in Vercel and in Supabase Auth redirect URLs); appoint/remove tenant admins by email (if the person hasn't signed in yet, the admin membership is created on their first sign-in).
+- F9-R2 `/admin/tenants` (super-admins only): list tenants (name, domains, #members, #pending requests, last dans.se sync, SMTP status); create tenant (name, slug, first domain); edit/deactivate tenant; manage domains (UI reminds that the domain must be added in Vercel and in Supabase Auth redirect URLs); appoint/remove tenant admins by email (if the person hasn't signed in yet, the admin membership is created on their first sign-in).
 - F9-R3 A super-admin can open any tenant and acts as its admin there (bypassing the approval queue). Every super-admin change is written to an audit log.
 - F9-R12 **Go-live check:** a tenant can't be activated until its SMTP test (F9-R10) succeeds.
-- F9-R13 `Done` **Medlemmar (members):** on `/superadmin/[slug]` a "Medlemmar" section lists tenant members (name, email, roles) and pending access requests. Super-admin can: approve a pending request directly as admin or booker (bypassing the tenant queue, per F9-R3); grant/revoke admin for existing members (last-admin guard on revoke); invite by email as admin — creates the auth user if missing (`auth.admin.createUser`), adds admin membership, sends a magic-link invite via the tenant's SMTP reusing F2-R3's link generation/templates. Every change writes a row to `platform_audit_log` (F9-R3): `id`, `created_at`, `actor_user_id`/`actor_email`, `tenant_id`, `action`, `details` jsonb; RLS allows super-admins to SELECT, no insert policy for authenticated/anon (service role is the only writer). `/superadmin` tenant list also now shows #members/#pending per tenant. Simplification: `approveRequest` does not reuse `/admin`'s exact query builder (duplicated inline) to avoid extra shared-module plumbing.
+- F9-R13 `Done` **Medlemmar (members):** on `/admin/tenants/[slug]` a "Medlemmar" section lists tenant members (name, email, roles) and pending access requests. Super-admin can: approve a pending request directly as admin or booker (bypassing the tenant queue, per F9-R3); grant/revoke admin for existing members (last-admin guard on revoke); invite by email as admin — creates the auth user if missing (`auth.admin.createUser`), adds admin membership, sends a magic-link invite via the tenant's SMTP reusing F2-R3's link generation/templates. Every change writes a row to `platform_audit_log` (F9-R3): `id`, `created_at`, `actor_user_id`/`actor_email`, `tenant_id`, `action`, `details` jsonb; RLS allows super-admins to SELECT, no insert policy for authenticated/anon (service role is the only writer). `/admin/tenants` tenant list also now shows #members/#pending per tenant. Simplification: `approveRequest` does not reuse `/admin`'s exact query builder (duplicated inline) to avoid extra shared-module plumbing.
 
 **Tenant settings** (`/admin/settings`, editable by tenant admins and super-admins)
 - F9-R4 `Partial` **Lokaler (rooms):** create/rename/reorder/deactivate rooms (title, active — description editable via `updateRoom` but no dedicated UI field yet); choose the **course room**. Simplification: changing the course room immediately flags conflicting bookings and returns a summary message ("X bokningar flaggades") instead of a separate preview-before-confirm step (F4-R10). Deactivated rooms can't be booked; existing bookings stay.
 - F9-R5 `Done` **Kategorier:** create/recolour/deactivate booking categories (name + colour) at `/admin/settings`. New tenants start with Träning, Privatlektion, Föreningsaktivitet (default colours, from existing seed). At least one active category is required (enforced server-side). Rename/reorder UI not built (simplification — colour/active toggle and create are).
 - F9-R6 `Partial` **General** (`/admin/settings`): name, timezone (default `Europe/Stockholm`), max days ahead for bookings (default 90), club logo upload (PNG/WebP only — SVG deliberately unsupported, stored-XSS risk via inline `<script>`/`on*` — ≤1MB, magic-byte-verified server-side, not just MIME type) stored in Supabase Storage bucket `tenant-logos` under a per-tenant folder (`tenants.logo_path`), admin-only write via storage RLS scoped to the tenant's folder, public read. Rendered above "Bokningssystem" on auth pages and in the protected/start-page headers via the `Logo` component; falls back to the current Gåsasteget default images when unset. Plain-URL fallback field removed.
-- F9-R7 `Done` (unchanged) **dans.se import:** dans.se link or org slug and API token — still at `/superadmin/[slug]`; save/sync logic factored into `lib/tenant-settings/save.ts` and reused by `/admin/settings`.
+- F9-R7 `Done` (unchanged) **dans.se import:** dans.se link or org slug and API token — still at `/admin/tenants/[slug]`; save/sync logic factored into `lib/tenant-settings/save.ts` and reused by `/admin/settings`.
 - F9-R8 `Partial` **Theme** (`/admin/settings`): hex colour inputs for primary, primary text (on primary), secondary, accent, background, surface, text, muted text, header gradient start/end; saved to `tenants.theme` jsonb. Applied as server-rendered CSS variables in the root layout (`:root{--color-primary:...}` etc., no flash of default colours). Additionally, `tenants.bg_gradient_from/via/to` (hex, `via` and `to` nullable — a solid colour when only `from` is set) drive `--tenant-bg`, consumed by the `hero-gradient` utility (used on the start-page hero, the auth layout background, and the protected header) in place of the old hard-coded gradient; defaults reproduce the current Gåsasteget look (`#2d284d` → `#4b4280` → `#9e97c4`). `--color-primary`/`--color-secondary` now also drive the `purple-main`/`purple-light` Tailwind tokens so the saved theme colours are visually applied, not just present as unused CSS vars. No live preview beyond the gradient/logo pickers' own inline preview, no "Återställ standard", no contrast warning (all skipped).
-- F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings. `Done` — implemented at `/superadmin/[slug]` (not yet `/admin/settings`; tenant-admin-facing route is future work).
+- F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings. `Done` — implemented at `/admin/tenants/[slug]` (not yet `/admin/settings`; tenant-admin-facing route is future work).
 - F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them. `Done` for SMTP password (app-side AES-256-GCM, `SMTP_ENC_KEY`); dans.se token encryption unchanged/still plaintext.
 
 **Data model**
@@ -313,7 +313,7 @@ audit_log(id, actor_id, tenant_id NULL, action, details jsonb, created_at)
 `theme` = `{ primary, onPrimary, secondary, accent, background, surface, text, mutedText, headerFrom, headerTo }` (hex).
 
 **Acceptance criteria**
-- Given `buggfille@gmail.com` is seeded in `platform_admins` and signs in, then `/superadmin` is available; for any other user it's denied.
+- Given `buggfille@gmail.com` is seeded in `platform_admins` and signs in, then `/admin/tenants` is available; for any other user it's denied.
 - Given the super-admin creates tenant "Nackswinget" (`nsw`) with domain `boka.nackswinget.se` and admin `x@y.se`, then when x@y.se first signs in on that domain they are admin there without going through the queue.
 - Given a tenant without a successful SMTP test, then it can't be activated.
 - Given an admin enters `https://dans.se/nsw/` and a valid token, then `nsw` is stored and the page shows "5 evenemang hittades"; with an invalid token it shows the dans.se error.
@@ -321,13 +321,13 @@ audit_log(id, actor_id, tenant_id NULL, action, details jsonb, created_at)
 - Given a tenant admin sets primary to `#0B6E4F` and saves, then buttons and the header on that tenant's domain use it on next load, and other tenants are unaffected.
 - Given text `#777777` on background `#FFFFFF`, then a contrast warning is shown.
 - Given the course room changes from Stora to Lilla salen and 2 bookings in Lilla salen overlap course occasions, then the admin sees those 2 before confirming, and after confirming they are flagged.
-- Given a tenant admin of A, then they cannot open `/superadmin` or B's settings.
+- Given a tenant admin of A, then they cannot open `/admin/tenants` or B's settings.
 
 ---
 
 ## Non-functional
 
-- UI language: Swedish. URL paths are English (`/login`, `/register`, `/waiting`, `/dashboard`, `/admin`, `/superadmin`). **(change)** from `/logga-in`, `/registrera`; old paths redirect to the new ones.
+- UI language: Swedish. URL paths are English (`/login`, `/waiting`, `/`, `/admin`, `/admin/tenants`). **(change)** from `/logga-in`, `/registrera`, `/dashboard`, `/superadmin`, `/platform/login`, `/register`; no redirects from the old paths.
 - Look & feel: tenant theme; Gåsasteget uses the gasasteget.se palette, Inter/Montserrat, and its logo.
 - Mobile-first: works at 360px wide, no horizontal scroll.
 - Stack: Next.js 15 App Router, Supabase (auth, Postgres, RLS), Tailwind v4, Vercel (custom domain per tenant).

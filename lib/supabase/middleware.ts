@@ -84,44 +84,23 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Permanent redirects for old Swedish route slugs (F2/F9 non-functional req).
-  const oldToNew: Record<string, string> = {
-    "/logga-in": "/login",
-    "/registrera": "/register",
-  };
-  const newPath = oldToNew[request.nextUrl.pathname];
-  if (newPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = newPath;
-    return NextResponse.redirect(url, 308);
-  }
-
   // Redirect unauthenticated users from protected routes
-  const isProtectedRoute =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/admin") ||
-    request.nextUrl.pathname.startsWith("/superadmin") ||
-    request.nextUrl.pathname.startsWith("/waiting");
+  const isProtectedRoute = request.nextUrl.pathname.startsWith("/admin");
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();
-    const isPlatform = request.nextUrl.pathname.startsWith("/superadmin");
-    url.pathname = isPlatform ? "/platform/login" : "/login";
+    url.pathname = "/login";
     url.search = "";
-    if (!isPlatform) url.searchParams.set("next", request.nextUrl.pathname);
+    url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from auth pages
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/platform/login");
+  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
 
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();
-    url.pathname = request.nextUrl.pathname.startsWith("/platform")
-      ? "/superadmin"
-      : "/dashboard";
+    url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
   }

@@ -169,7 +169,7 @@ export async function approveRequest(
 
   await logAudit(tenantId, "approve_request", { requestId, role, email: request.email });
 
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return { message: "Förfrågan godkänd." };
 }
 
@@ -218,7 +218,7 @@ export async function setAdminMembership(
 
   await logAudit(tenantId, "set_admin_membership", { userId, grant });
 
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return { message: grant ? "Admin tilldelad." : "Admin borttagen." };
 }
 
@@ -273,7 +273,7 @@ export async function inviteAdminByEmail(
     await sendTenantEmail(tenantId, { to: trimmed, subject, html, text });
   } catch {
     await logAudit(tenantId, "invite_admin_by_email", { email: trimmed, sent: false });
-    revalidatePath(`/superadmin/${slug}`);
+    revalidatePath(`/admin/tenants/${slug}`);
     return {
       error: "Admin tillagd men inbjudningsmejlet kunde inte skickas (SMTP saknas).",
     };
@@ -281,7 +281,7 @@ export async function inviteAdminByEmail(
 
   await logAudit(tenantId, "invite_admin_by_email", { email: trimmed, sent: true });
 
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return { message: "Inbjudan skickad." };
 }
 
@@ -296,7 +296,7 @@ export async function saveSmtpSettings(
   if (!tenantId) return { error: "Klubb hittades inte." };
 
   const result = await saveSmtpSettingsForTenant(tenantId, formData);
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return result;
 }
 
@@ -311,7 +311,7 @@ export async function sendSmtpTestEmail(
   if (!tenantId) return { error: "Klubb hittades inte." };
 
   const result = await sendSmtpTestEmailForTenant(tenantId, to);
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return result;
 }
 
@@ -326,7 +326,7 @@ export async function saveDansSeSettings(
   if (!tenantId) return { error: "Klubb hittades inte." };
 
   const result = await saveDansSeSettingsForTenant(tenantId, formData);
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return result;
 }
 
@@ -340,6 +340,6 @@ export async function syncDansSeNow(
   if (!tenantId) return { error: "Klubb hittades inte." };
 
   const result = await syncDansSeNowForTenant(tenantId);
-  revalidatePath(`/superadmin/${slug}`);
+  revalidatePath(`/admin/tenants/${slug}`);
   return result;
 }

@@ -16,7 +16,7 @@ export function RoomSidebar({ rooms }: { rooms: Room[] }) {
     } else {
       params.delete("room");
     }
-    router.push(`/dashboard?${params.toString()}`);
+    router.push(`/?${params.toString()}`);
   }
 
   return (

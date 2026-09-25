@@ -18,10 +18,16 @@ vi.mock("@/lib/tenant/current", () => ({
   getTenantLogoUrl: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn().mockResolvedValue({
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+  }),
+}));
+
 // Home is an async server component; resolve it to a plain element before
 // rendering with Testing Library (which requires a synchronous component).
 async function Home() {
-  return await HomeAsync();
+  return await HomeAsync({ searchParams: Promise.resolve({}) });
 }
 
 describe("Home", () => {

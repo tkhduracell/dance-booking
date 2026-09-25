@@ -7,7 +7,7 @@ import { CreateTenantForm } from "./create-tenant-form";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Superadmin - Gasasteget",
+  title: "Admin - Gasasteget",
 };
 
 export default async function SuperAdminPage() {
@@ -40,7 +40,7 @@ export default async function SuperAdminPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">Superadmin</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Klubbar</h1>
       <p className="mt-2 text-gray-600">Hantera klubbar (tenants).</p>
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
@@ -88,7 +88,7 @@ export default async function SuperAdminPage() {
                   </td>
                   <td className="py-2">
                     <Link
-                      href={`/superadmin/${t.slug}`}
+                      href={`/admin/tenants/${t.slug}`}
                       className="text-blue-600 hover:underline"
                     >
                       Inställningar

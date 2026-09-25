@@ -94,7 +94,7 @@ describe("updateBooking (F4-R6 / F4-R11)", () => {
         buildSupabaseMock({ existingBooking: bookingRow() })
       ),
     }));
-    const { updateBooking } = await import("./actions");
+    const { updateBooking } = await import("./dashboard-actions");
 
     const result = await updateBooking("booking-1", {
       roomId: "room-2",
@@ -120,7 +120,7 @@ describe("updateBooking (F4-R6 / F4-R11)", () => {
         buildSupabaseMock({ existingBooking: bookingRow({ booked_by: "owner-1" }) })
       ),
     }));
-    const { updateBooking } = await import("./actions");
+    const { updateBooking } = await import("./dashboard-actions");
 
     const result = await updateBooking("booking-1", {
       roomId: "room-2",
@@ -145,7 +145,7 @@ describe("updateBooking (F4-R6 / F4-R11)", () => {
         buildSupabaseMock({ existingBooking: bookingRow({ booked_by: "owner-1" }) })
       ),
     }));
-    const { updateBooking } = await import("./actions");
+    const { updateBooking } = await import("./dashboard-actions");
 
     await updateBooking("booking-1", {
       roomId: "room-2",
@@ -172,7 +172,7 @@ describe("cancelBooking (F4-R6 / F4-R11)", () => {
         buildSupabaseMock({ existingBooking: bookingRow({ booked_by: "owner-1" }) })
       ),
     }));
-    const { cancelBooking } = await import("./actions");
+    const { cancelBooking } = await import("./dashboard-actions");
 
     const result = await cancelBooking("booking-1");
 

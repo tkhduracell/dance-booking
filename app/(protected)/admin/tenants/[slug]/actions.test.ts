@@ -71,21 +71,21 @@ describe("F9-R13 superadmin members actions", () => {
 
   it("requireSuperAdmin guard rejects a non-super-admin caller for listTenantMembers", async () => {
     mockRequireSuperAdmin.mockImplementation(async () => {
-      throw new Error("redirect: /dashboard");
+      throw new Error("redirect: /");
     });
     await expect(listTenantMembers("nsw")).rejects.toThrow();
   });
 
   it("requireSuperAdmin guard rejects a non-super-admin caller for approveRequest", async () => {
     mockRequireSuperAdmin.mockImplementation(async () => {
-      throw new Error("redirect: /dashboard");
+      throw new Error("redirect: /");
     });
     await expect(approveRequest("nsw", "req-1", "admin")).rejects.toThrow();
   });
 
   it("requireSuperAdmin guard rejects a non-super-admin caller for setAdminMembership", async () => {
     mockRequireSuperAdmin.mockImplementation(async () => {
-      throw new Error("redirect: /dashboard");
+      throw new Error("redirect: /");
     });
     await expect(
       setAdminMembership("nsw", "user-1", "tenant-1", true)
@@ -94,7 +94,7 @@ describe("F9-R13 superadmin members actions", () => {
 
   it("requireSuperAdmin guard rejects a non-super-admin caller for inviteAdminByEmail", async () => {
     mockRequireSuperAdmin.mockImplementation(async () => {
-      throw new Error("redirect: /dashboard");
+      throw new Error("redirect: /");
     });
     await expect(
       inviteAdminByEmail("nsw", "a@b.com", "tenant-1")

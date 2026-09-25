@@ -95,12 +95,12 @@ export async function hasPermission(action: string): Promise<boolean> {
 }
 
 /**
- * Require a specific permission. Redirects to /dashboard if denied.
+ * Require a specific permission. Redirects to / if denied.
  */
 export async function requirePermission(action: string): Promise<void> {
   const allowed = await hasPermission(action);
   if (!allowed) {
-    redirect("/dashboard");
+    redirect("/");
   }
 }
 
@@ -114,12 +114,12 @@ export async function hasRole(roleName: string): Promise<boolean> {
 }
 
 /**
- * Require a specific role. Redirects to /dashboard if denied.
+ * Require a specific role. Redirects to / if denied.
  */
 export async function requireRole(roleName: string): Promise<void> {
   const allowed = await hasRole(roleName);
   if (!allowed) {
-    redirect("/dashboard");
+    redirect("/");
   }
 }
 
@@ -140,10 +140,10 @@ export async function isSuperAdmin(): Promise<boolean> {
   return Boolean(data);
 }
 
-/** F9-R2: require super-admin. Redirects to /dashboard if denied. */
+/** F9-R2: require super-admin. Redirects to / if denied. */
 export async function requireSuperAdmin(): Promise<void> {
   const allowed = await isSuperAdmin();
   if (!allowed) {
-    redirect("/dashboard");
+    redirect("/");
   }
 }
