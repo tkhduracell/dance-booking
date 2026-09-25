@@ -1,3 +1,4 @@
+import { Logo } from "@/app/components/logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
@@ -35,7 +36,7 @@ export default async function ProtectedLayout({
     const request = existingRequest as AccessRequest | null;
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-gray-warm px-4">
         <div className="w-full max-w-md">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-bold text-gray-900">Gasasteget</h1>
@@ -95,24 +96,22 @@ export default async function ProtectedLayout({
   const isAdmin = currentUser.roles.includes("admin");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-gray-warm">
+      <header className="hero-gradient text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <a href="/dashboard" className="text-lg font-bold text-gray-900">
-              Gasasteget
-            </a>
+            <a href="/dashboard" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" /></a>
             <nav className="flex gap-4 text-sm">
               <a
                 href="/dashboard"
-                className="text-gray-600 hover:text-gray-900"
+                className="text-white/80 hover:text-white"
               >
                 Dashboard
               </a>
               {isAdmin && (
                 <a
                   href="/admin"
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-white/80 hover:text-white"
                 >
                   Admin
                 </a>
@@ -120,7 +119,7 @@ export default async function ProtectedLayout({
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">{user.email}</span>
+            <span className="text-sm text-white/80">{user.email}</span>
             <SignOutButton />
           </div>
         </div>

@@ -1,17 +1,21 @@
+import { Logo } from "@/app/components/logo";
 import { MonthCalendar } from "./components/calendar/MonthCalendar";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-gray-warm">
-      <header className="bg-purple-main py-6 text-white">
-        <div className="mx-auto max-w-4xl px-4 text-center">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Gasasteget
+      <header className="hero-gradient text-white">
+        <div className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:pb-14">
+          <Logo variant="horizontal" className="h-10 w-auto" />
+          <h1 className="mt-8 font-display text-3xl font-extrabold uppercase tracking-[0.2em] sm:text-5xl">
+            Schema
           </h1>
-          <p className="mt-1 text-white/80">Schema</p>
+          <p className="mt-3 max-w-xl text-white/85">
+            Kurser, socialdans och event i klubbens lokal.
+          </p>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <div className="mx-auto mt-6 w-full max-w-5xl flex-1 px-4 pb-12">
         <MonthCalendar />
       </div>
     </main>

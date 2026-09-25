@@ -90,32 +90,32 @@ export function MonthCalendar() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <button
           onClick={prev}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-purple-dark hover:bg-purple-light/10"
+          className="shrink-0 whitespace-nowrap rounded-full bg-white px-3 py-1.5 sm:px-4 text-sm font-semibold text-purple-dark shadow-sm transition hover:bg-[#e4dac3]"
           aria-label="Föregående månad"
         >
-          ← Förra
+          ←<span className="hidden sm:inline"> Förra</span>
         </button>
-        <h2 className="text-lg font-bold text-purple-dark sm:text-xl">
+        <h2 className="whitespace-nowrap font-display text-base font-extrabold uppercase tracking-[0.12em] sm:text-lg text-purple-dark sm:text-xl">
           {MONTH_NAMES[month]} {year}
         </h2>
         <button
           onClick={next}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-purple-dark hover:bg-purple-light/10"
+          className="shrink-0 whitespace-nowrap rounded-full bg-white px-3 py-1.5 sm:px-4 text-sm font-semibold text-purple-dark shadow-sm transition hover:bg-[#e4dac3]"
           aria-label="Nästa månad"
         >
-          Nästa →
+          <span className="hidden sm:inline">Nästa </span>→
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
         <div className="grid grid-cols-7">
           {DAY_NAMES.map((name) => (
             <div
               key={name}
-              className="bg-purple-main py-2 text-center text-xs font-semibold tracking-wide text-white sm:text-sm"
+              className="bg-purple-dark py-2 text-center text-xs font-semibold uppercase tracking-widest text-white sm:text-sm"
             >
               {name}
             </div>
