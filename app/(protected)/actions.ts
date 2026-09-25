@@ -150,6 +150,25 @@ export async function deleteOwnAccount(): Promise<{ error?: string }> {
 
   const admin = createAdminClient();
 
+  // Don't orphan a tenant: the last admin must hand over first.
+  const { data: adminRows } = await admin
+    .from("memberships")
+    .select("tenant_id, roles!inner(name)")
+    .eq("user_id", user.id)
+    .eq("roles.name", "admin");
+  for (const row of adminRows ?? []) {
+    const { count } = await admin
+      .from("memberships")
+      .select("user_id, roles!inner(name)", { count: "exact", head: true })
+      .eq("tenant_id", row.tenant_id)
+      .eq("roles.name", "admin");
+    if ((count ?? 0) <= 1) {
+      return {
+        error: "Du är enda administratören i en klubb. Utse en ny administratör först.",
+      };
+    }
+  }
+
   await admin.from("memberships").delete().eq("user_id", user.id);
   await admin.from("access_requests").delete().eq("user_id", user.id).eq("status", "pending");
 
