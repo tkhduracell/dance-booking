@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["600", "800"],
+// Self-hosted (from @fontsource-variable) so builds don't depend on Google Fonts
+const inter = localFont({
+  src: "./fonts/inter.woff2",
+  weight: "100 900",
+  variable: "--font-inter",
+});
+const montserrat = localFont({
+  src: "./fonts/montserrat.woff2",
+  weight: "100 900",
   variable: "--font-montserrat",
 });
 
