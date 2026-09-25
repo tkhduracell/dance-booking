@@ -2,8 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current";
+import { sendTenantEmail } from "@/lib/email/mailer";
+import {
+  bookingChangedByAdminEmail,
+  bookingCancelledByAdminEmail,
+} from "@/lib/email/templates";
 import {
   validateBooking,
   canModifyBooking,
@@ -53,25 +59,40 @@ async function loadImportedOccasions(
   }));
 }
 
-async function logActivity(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  params: {
-    tenantId: string;
-    bookingId: string;
-    actorId: string;
-    type: "created" | "moved" | "edited" | "cancelled";
-    before: Record<string, unknown> | null;
-    after: Record<string, unknown> | null;
+/** F4-R11: notify the booking owner when someone else (an admin) changed
+ * their booking. Best-effort — never blocks the mutation. */
+async function notifyOwnerOfAdminChange(params: {
+  tenantId: string;
+  tenantName: string;
+  ownerId: string | null;
+  actorId: string;
+  title: string;
+  kind: "changed" | "cancelled";
+  oldWhen?: string;
+  newWhen?: string;
+  when?: string;
+}) {
+  if (!params.ownerId || params.ownerId === params.actorId) return;
+  try {
+    const admin = createAdminClient();
+    const { data: authUser } = await admin.auth.admin.getUserById(params.ownerId);
+    const email = authUser?.user?.email;
+    if (!email) return;
+
+    const { subject, html, text } =
+      params.kind === "changed"
+        ? bookingChangedByAdminEmail(
+            params.tenantName,
+            params.title,
+            params.oldWhen ?? "",
+            params.newWhen ?? ""
+          )
+        : bookingCancelledByAdminEmail(params.tenantName, params.title, params.when ?? "");
+
+    await sendTenantEmail(params.tenantId, { to: email, subject, html, text });
+  } catch {
+    // Send failures must never block the mutation.
   }
-) {
-  await supabase.from("activity_log").insert({
-    tenant_id: params.tenantId,
-    booking_id: params.bookingId,
-    actor_id: params.actorId,
-    type: params.type,
-    before: params.before,
-    after: params.after,
-  });
 }
 
 /** F4-R1: create a booking. Always booked_by = current user. */
@@ -112,32 +133,21 @@ export async function createBooking(input: {
   });
   if (!result.ok) return result;
 
-  const { data: inserted, error } = await supabase
-    .from("bookings")
-    .insert({
-      tenant_id: tenant.id,
-      room_id: input.roomId,
-      category_id: input.categoryId,
-      title: input.title,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
-      booked_by: user.id,
-    })
-    .select("id")
-    .single();
-
-  if (error || !inserted) {
-    return { ok: false, error: error?.message ?? "Tiden krockar med en annan bokning" };
-  }
-
-  await logActivity(supabase, {
-    tenantId: tenant.id,
-    bookingId: inserted.id,
-    actorId: user.id,
-    type: "created",
-    before: null,
-    after: { title: input.title, roomId: input.roomId, startsAt: input.startsAt },
+  // F4-R6: booking insert + activity_log insert happen atomically in the RPC.
+  const { error } = await supabase.rpc("create_booking_with_log", {
+    p_tenant_id: tenant.id,
+    p_room_id: input.roomId,
+    p_category_id: input.categoryId,
+    p_title: input.title,
+    p_starts_at: input.startsAt,
+    p_ends_at: input.endsAt,
+    p_booked_by: user.id,
+    p_actor_id: user.id,
   });
+
+  if (error) {
+    return { ok: false, error: error.message ?? "Tiden krockar med en annan bokning" };
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };
@@ -198,40 +208,44 @@ export async function updateBooking(
   });
   if (!result.ok) return result;
 
-  const { error } = await supabase
-    .from("bookings")
-    .update({
-      room_id: input.roomId,
-      category_id: input.categoryId,
-      title: input.title,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
-      updated_at: new Date().toISOString(),
-      // F4-R10: moving a booking clears any conflict flag; a new one is
-      // recomputed by the next sync if it still overlaps.
-      conflict_occasion_id: null,
-    })
-    .eq("id", bookingId);
-
-  if (error) return { ok: false, error: "Tiden krockar med en annan bokning" };
-
   const roomChanged = existingBooking.room_id !== input.roomId;
   const timeChanged =
     existingBooking.starts_at !== input.startsAt || existingBooking.ends_at !== input.endsAt;
   const type: "moved" | "edited" = roomChanged || timeChanged ? "moved" : "edited";
 
-  await logActivity(supabase, {
-    tenantId: tenant.id,
-    bookingId,
-    actorId: user.id,
-    type,
-    before: {
-      title: existingBooking.title,
-      roomId: existingBooking.room_id,
-      startsAt: existingBooking.starts_at,
-    },
-    after: { title: input.title, roomId: input.roomId, startsAt: input.startsAt },
+  // F4-R6: booking update + activity_log insert happen atomically in the RPC.
+  const { error } = await supabase.rpc("update_booking_with_log", {
+    p_booking_id: bookingId,
+    p_tenant_id: tenant.id,
+    p_room_id: input.roomId,
+    p_category_id: input.categoryId,
+    p_title: input.title,
+    p_starts_at: input.startsAt,
+    p_ends_at: input.endsAt,
+    p_actor_id: user.id,
+    p_log_type: type,
   });
+
+  if (error) return { ok: false, error: "Tiden krockar med en annan bokning" };
+
+  // F4-R11: notify the owner when an admin changed someone else's booking.
+  if (isAdmin) {
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("name")
+      .eq("id", tenant.id)
+      .single();
+    await notifyOwnerOfAdminChange({
+      tenantId: tenant.id,
+      tenantName: tenantRow?.name ?? tenant.slug,
+      ownerId: existingBooking.booked_by,
+      actorId: user.id,
+      title: input.title,
+      kind: "changed",
+      oldWhen: existingBooking.starts_at,
+      newWhen: input.startsAt,
+    });
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };
@@ -261,25 +275,32 @@ export async function cancelBooking(bookingId: string): Promise<ActionResult> {
     return { ok: false, error: "Du kan inte ställa in denna bokning" };
   }
 
-  const { error } = await supabase
-    .from("bookings")
-    .update({ status: "cancelled", updated_at: new Date().toISOString() })
-    .eq("id", bookingId);
+  // F4-R6: booking cancel + activity_log insert happen atomically in the RPC.
+  const { error } = await supabase.rpc("cancel_booking_with_log", {
+    p_booking_id: bookingId,
+    p_tenant_id: tenant.id,
+    p_actor_id: user.id,
+  });
 
   if (error) return { ok: false, error: error.message };
 
-  await logActivity(supabase, {
-    tenantId: tenant.id,
-    bookingId,
-    actorId: user.id,
-    type: "cancelled",
-    before: {
+  // F4-R11: notify the owner when an admin cancelled someone else's booking.
+  if (isAdmin) {
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("name")
+      .eq("id", tenant.id)
+      .single();
+    await notifyOwnerOfAdminChange({
+      tenantId: tenant.id,
+      tenantName: tenantRow?.name ?? tenant.slug,
+      ownerId: existingBooking.booked_by,
+      actorId: user.id,
       title: existingBooking.title,
-      roomId: existingBooking.room_id,
-      startsAt: existingBooking.starts_at,
-    },
-    after: null,
-  });
+      kind: "cancelled",
+      when: existingBooking.starts_at,
+    });
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };

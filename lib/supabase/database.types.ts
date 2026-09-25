@@ -386,7 +386,62 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "get_user_display_names":
+            "admin_count_in_tenant":
+{ Args: { "p_tenant_id": string }; Returns: number
+                           },
+"cancel_booking_with_log":
+{ Args: { "p_actor_id": string,"p_booking_id": string,"p_tenant_id": string }; Returns: {
+              "booked_by": string | null,
+"category_id": string,
+"conflict_occasion_id": string | null,
+"created_at": string,
+"ends_at": string,
+"id": string,
+"room_id": string,
+"starts_at": string,
+"status": string,
+"tenant_id": string,
+"title": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "bookings"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"create_booking_with_log":
+{ Args: { "p_actor_id": string,"p_booked_by": string,"p_category_id": string,"p_ends_at": string,"p_room_id": string,"p_starts_at": string,"p_tenant_id": string,"p_title": string }; Returns: {
+              "booked_by": string | null,
+"category_id": string,
+"conflict_occasion_id": string | null,
+"created_at": string,
+"ends_at": string,
+"id": string,
+"room_id": string,
+"starts_at": string,
+"status": string,
+"tenant_id": string,
+"title": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "bookings"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"get_imported_courses_with_conflicts":
+{ Args: { "p_tenant_id": string }; Returns: {
+              "conflicts_count": number,"course_id": string,"name": string,"occasions_count": number,"schedule_text": string
+            }[]
+                           },
+"get_tenant_members":
+{ Args: { "p_tenant_id": string }; Returns: {
+              "email": string,"name": string,"roles": (string)[],"user_id": string
+            }[]
+                           },
+"get_user_display_names":
 { Args: { "p_user_ids": (string)[] }; Returns: {
               "id": string,"name": string
             }[]
@@ -405,6 +460,27 @@ isOneToOne: false
 "is_tenant_member":
 { Args: { "p_tenant_id": string,"p_user_id": string }; Returns: boolean
                            },
+"update_booking_with_log":
+{ Args: { "p_actor_id": string,"p_booking_id": string,"p_category_id": string,"p_ends_at": string,"p_log_type": string,"p_room_id": string,"p_starts_at": string,"p_tenant_id": string,"p_title": string }; Returns: {
+              "booked_by": string | null,
+"category_id": string,
+"conflict_occasion_id": string | null,
+"created_at": string,
+"ends_at": string,
+"id": string,
+"room_id": string,
+"starts_at": string,
+"status": string,
+"tenant_id": string,
+"title": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "bookings"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "user_has_permission_in_tenant":
 { Args: { "p_action": string,"p_tenant_id": string,"p_user_id": string }; Returns: boolean
                            }

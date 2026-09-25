@@ -137,6 +137,28 @@ export async function updateAccessRequestDetails(
   return {};
 }
 
+/** F2-R8: self-service account deletion. Memberships and pending requests
+ * are removed across all tenants (service role, no tenant scoping needed);
+ * bookings/activity_log keep booked_by/actor_id as NULL via the FK's
+ * ON DELETE SET NULL, so they render as "Tidigare medlem". */
+export async function deleteOwnAccount(): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Du måste vara inloggad." };
+
+  const admin = createAdminClient();
+
+  await admin.from("memberships").delete().eq("user_id", user.id);
+  await admin.from("access_requests").delete().eq("user_id", user.id).eq("status", "pending");
+
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) return { error: error.message };
+
+  return {};
+}
+
 /** F3-R7: a denied user can request again. */
 export async function requestAgain(): Promise<{ error?: string }> {
   const supabase = await createClient();

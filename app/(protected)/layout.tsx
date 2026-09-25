@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
 import { SignOutButton } from "@/app/components/auth/sign-out-button";
+import { DeleteAccountButton } from "@/app/components/auth/delete-account-button";
 import { ensureAccessRequest } from "./actions";
 
 export default async function ProtectedLayout({
@@ -56,6 +57,7 @@ export default async function ProtectedLayout({
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-white/80">{user.email}</span>
+            <DeleteAccountButton />
             <SignOutButton />
           </div>
         </div>
