@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 
 export function SignInForm() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const supabase = createClient();
 
   const handleSocialLogin = async (provider: "google" | "facebook" | "azure") => {
@@ -26,22 +26,37 @@ export function SignInForm() {
     }
   };
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
 
     if (error) {
       setError(error.message);
+    } else {
+      setSent(true);
     }
 
     setLoading(false);
   };
+
+  if (sent) {
+    return (
+      <div className="w-full max-w-sm rounded-md bg-green-50 p-4 text-sm text-green-700">
+        <p className="font-medium">Kolla din e-post!</p>
+        <p className="mt-1">
+          Vi har skickat en inloggningslänk till <strong>{email}</strong>.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-sm space-y-6">
@@ -91,8 +106,8 @@ export function SignInForm() {
         </div>
       </div>
 
-      {/* Email/password form */}
-      <form onSubmit={handleEmailLogin} className="space-y-4">
+      {/* Magic link / one-time code (F2-R1) */}
+      <form onSubmit={handleMagicLink} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             E-post
@@ -108,35 +123,14 @@ export function SignInForm() {
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Lösenord
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-
         <button
           type="submit"
           disabled={loading}
           className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
         >
-          {loading ? "Loggar in..." : "Logga in"}
+          {loading ? "Skickar..." : "Skicka inloggningslänk"}
         </button>
       </form>
-
-      <p className="text-center text-sm text-gray-600">
-        Har du inget konto?{" "}
-        <a href="/registrera" className="font-medium text-blue-600 hover:text-blue-500">
-          Registrera dig
-        </a>
-      </p>
     </div>
   );
 }
