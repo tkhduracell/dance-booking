@@ -51,7 +51,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 **Requirements**
 - F0-R1 Every tenant-owned row (rooms, categories, bookings, memberships, access requests, imported courses/occasions, activity log) has `tenant_id`. RLS restricts all reads/writes to rows of the tenant the user acts in; no cross-tenant leakage.
 - F0-R2 The current tenant is resolved per request from the `Host` header via `tenant_domains(domain → tenant_id)`.
-- F0-R3 Fallback when the host is not a registered domain (localhost, `*.vercel.app` previews): `?tenant=<slug>` query param (stored in a cookie for the session), else env `DEFAULT_TENANT`. `?tenant=` is ignored on registered custom domains.
+- F0-R3 Fallback when the host is not a registered domain (localhost, `*.vercel.app` previews): `?tenant=<slug>` query param (stored in a cookie for the session), else env `DEFAULT_TENANT`. `?tenant=` is ignored on registered custom domains. When the tenant comes only from `DEFAULT_TENANT` (no domain, param or cookie), auth pages render neutral (unbranded "Dansbokning"); in production every tenant is served on its own subdomain, so this only affects localhost/previews. The super-admin signs in at the always-neutral `/platform/login` (unauthenticated `/superadmin` redirects there) and lands on `/superadmin`. Post-login `next` targets must be same-origin paths.
 - F0-R4 Unknown host with no fallback → 404 page "Klubben hittades inte".
 - F0-R5 Tenant settings are defined in F9.
 - F0-R6 Branding: the UI uses the tenant's logo and colours; Gåsasteget's current theme becomes its tenant settings **(change)**.

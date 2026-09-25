@@ -28,3 +28,9 @@ export async function getCurrentTenant(): Promise<CurrentTenant | null> {
   if (!id || !slug) return null;
   return { id, slug };
 }
+
+/** True when the tenant came only from DEFAULT_TENANT (no domain, ?tenant= or cookie). */
+export async function isTenantFallback(): Promise<boolean> {
+  const h = await headers();
+  return h.get("x-tenant-fallback") === "1";
+}

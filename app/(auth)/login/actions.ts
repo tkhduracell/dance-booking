@@ -1,5 +1,6 @@
 "use server";
 
+import { safeNext } from "@/lib/auth/safe-next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTenant } from "@/lib/tenant/current";
 import { sendTenantEmail } from "@/lib/email/mailer";
@@ -10,7 +11,8 @@ import { magicLinkEmail } from "@/lib/email/templates";
  * mailer. Generates the link with the admin API and emails it ourselves.
  */
 export async function sendMagicLink(
-  email: string
+  email: string,
+  next?: string
 ): Promise<{ error?: string }> {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed || !trimmed.includes("@")) {
@@ -46,7 +48,7 @@ export async function sendMagicLink(
   if (error || !hashed) {
     return { error: "Kunde inte skapa inloggningslänk." };
   }
-  const link = `${appUrl}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=magiclink`;
+  const link = `${appUrl}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=magiclink&next=${encodeURIComponent(safeNext(next))}`;
 
   const { subject, html, text } = magicLinkEmail(
     tenantName,

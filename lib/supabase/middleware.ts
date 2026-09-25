@@ -71,6 +71,10 @@ export async function updateSession(request: NextRequest) {
     if (tenant) {
       supabaseResponse.headers.set("x-tenant-id", tenant.id);
       supabaseResponse.headers.set("x-tenant-slug", tenant.slug);
+      // Only the DEFAULT_TENANT fallback resolved it (bare localhost/preview): auth pages go neutral.
+      if (!domainTenant && !effectiveQueryTenant && !cookieTenant) {
+        supabaseResponse.headers.set("x-tenant-fallback", "1");
+      }
       if (!domainTenant && effectiveQueryTenant) {
         supabaseResponse.cookies.set(TENANT_COOKIE, tenant.slug, {
           path: "/",
@@ -101,17 +105,24 @@ export async function updateSession(request: NextRequest) {
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", request.nextUrl.pathname);
+    const isPlatform = request.nextUrl.pathname.startsWith("/superadmin");
+    url.pathname = isPlatform ? "/platform/login" : "/login";
+    url.search = "";
+    if (!isPlatform) url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from auth pages
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const isAuthRoute =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/platform/login");
 
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = request.nextUrl.pathname.startsWith("/platform")
+      ? "/superadmin"
+      : "/dashboard";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
