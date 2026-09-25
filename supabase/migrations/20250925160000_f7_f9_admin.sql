@@ -40,6 +40,9 @@ AS $$
 DECLARE
   v_booking public.bookings;
 BEGIN
+  IF auth.uid() IS NULL OR p_actor_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'actor mismatch';
+  END IF;
   IF p_booked_by <> p_actor_id THEN
     RAISE EXCEPTION 'booked_by must equal the acting user';
   END IF;
@@ -84,6 +87,9 @@ DECLARE
   v_booking public.bookings;
   v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR p_actor_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'actor mismatch';
+  END IF;
   SELECT * INTO v_existing FROM public.bookings
     WHERE id = p_booking_id AND tenant_id = p_tenant_id
     FOR UPDATE;
@@ -135,6 +141,9 @@ DECLARE
   v_booking public.bookings;
   v_is_admin BOOLEAN;
 BEGIN
+  IF auth.uid() IS NULL OR p_actor_id IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'actor mismatch';
+  END IF;
   SELECT * INTO v_existing FROM public.bookings
     WHERE id = p_booking_id AND tenant_id = p_tenant_id
     FOR UPDATE;
@@ -175,7 +184,8 @@ AS $$
   SELECT COUNT(*)::INTEGER
   FROM public.memberships m
   JOIN public.roles r ON r.id = m.role_id
-  WHERE m.tenant_id = p_tenant_id AND r.name = 'admin';
+  WHERE m.tenant_id = p_tenant_id AND r.name = 'admin'
+    AND public.is_tenant_admin(auth.uid(), p_tenant_id);
 $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_count_in_tenant(UUID) TO authenticated;
@@ -196,6 +206,7 @@ AS $$
   JOIN auth.users u ON u.id = m.user_id
   JOIN public.roles r ON r.id = m.role_id
   WHERE m.tenant_id = p_tenant_id
+    AND public.is_tenant_admin(auth.uid(), p_tenant_id)
   GROUP BY m.user_id, u.raw_user_meta_data, u.email;
 $$;
 
@@ -225,7 +236,8 @@ AS $$
       WHERE io.course_id = c.id
     ) AS conflicts_count
   FROM public.imported_courses c
-  WHERE c.tenant_id = p_tenant_id AND c.removed_at IS NULL;
+  WHERE c.tenant_id = p_tenant_id AND c.removed_at IS NULL
+    AND public.is_tenant_admin(auth.uid(), p_tenant_id);
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_imported_courses_with_conflicts(UUID) TO authenticated;
