@@ -57,6 +57,7 @@ function buildTransport(config: TenantSmtpConfig) {
     port: config.port,
     secure: config.security === "tls",
     ignoreTLS: config.security === "none",
+    requireTLS: config.security === "starttls",
     auth: config.user ? { user: config.user, pass: config.password ?? "" } : undefined,
   });
 }

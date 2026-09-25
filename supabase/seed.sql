@@ -186,3 +186,20 @@ BEGIN
     ON CONFLICT (user_id, tenant_id) DO NOTHING;
   END IF;
 END $$;
+
+-- GoTrue fails ("Database error finding user") on NULL token columns
+UPDATE auth.users SET
+  confirmation_token = COALESCE(confirmation_token, ''),
+  recovery_token = COALESCE(recovery_token, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  email_change_token_current = COALESCE(email_change_token_current, ''),
+  email_change = COALESCE(email_change, ''),
+  phone_change = COALESCE(phone_change, ''),
+  phone_change_token = COALESCE(phone_change_token, ''),
+  reauthentication_token = COALESCE(reauthentication_token, '');
+
+INSERT INTO auth.identities (id, user_id, provider_id, provider, identity_data, created_at, updated_at, last_sign_in_at)
+SELECT gen_random_uuid(), u.id, u.id::text, 'email',
+  jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now()
+FROM auth.users u
+WHERE NOT EXISTS (SELECT 1 FROM auth.identities i WHERE i.user_id = u.id);

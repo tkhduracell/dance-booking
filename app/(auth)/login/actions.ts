@@ -33,21 +33,24 @@ export async function sendMagicLink(
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
 
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email: trimmed,
-    options: {
-      redirectTo: `${appUrl}/auth/callback`,
-    },
-  });
-
-  if (error || !data?.properties?.action_link) {
-    return { error: error?.message ?? "Kunde inte skapa inloggningslänk." };
+  // F2: first sign-in creates the account (auto-queued later on first visit)
+  const gen = () =>
+    admin.auth.admin.generateLink({ type: "magiclink", email: trimmed });
+  let { data, error } = await gen();
+  if (error) {
+    await admin.auth.admin.createUser({ email: trimmed, email_confirm: true });
+    ({ data, error } = await gen());
   }
+
+  const hashed = data?.properties?.hashed_token;
+  if (error || !hashed) {
+    return { error: "Kunde inte skapa inloggningslänk." };
+  }
+  const link = `${appUrl}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=magiclink`;
 
   const { subject, html, text } = magicLinkEmail(
     tenantName,
-    data.properties.action_link
+    link
   );
 
   try {

@@ -48,7 +48,7 @@ describe("sendMagicLink (F2-R3)", () => {
 
   it("generates a link via the admin API and sends it through tenant SMTP", async () => {
     mockGenerateLink.mockResolvedValue({
-      data: { properties: { action_link: "https://app/auth/callback?token=abc" } },
+      data: { properties: { hashed_token: "abc" } },
       error: null,
     });
 
@@ -66,7 +66,7 @@ describe("sendMagicLink (F2-R3)", () => {
 
   it("surfaces an error when the tenant has no SMTP configured", async () => {
     mockGenerateLink.mockResolvedValue({
-      data: { properties: { action_link: "https://app/auth/callback?token=abc" } },
+      data: { properties: { hashed_token: "abc" } },
       error: null,
     });
     mockSendTenantEmail.mockRejectedValueOnce(new Error("no smtp"));
