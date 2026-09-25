@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendMagicLink } from "@/app/(auth)/login/actions";
 
-export function SignInForm() {
+export function SignInForm({ next }: { next?: string } = {}) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export function SignInForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`,
         ...(provider === "azure" && {
           scopes: "openid profile email",
         }),
@@ -32,7 +32,7 @@ export function SignInForm() {
     setError(null);
     setLoading(true);
 
-    const { error } = await sendMagicLink(email);
+    const { error } = await sendMagicLink(email, next);
 
     if (error) {
       setError(error);

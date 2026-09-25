@@ -1,11 +1,25 @@
 import { Logo } from "@/app/components/logo";
-import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
+import { getCurrentTenant, getTenantLogoUrl, isTenantFallback } from "@/lib/tenant/current";
 
 export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (await isTenantFallback()) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-900 px-4">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 text-center">
+            <h1 className="text-lg font-semibold uppercase tracking-[0.3em] text-white">Dansbokning</h1>
+            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-white/60">Bokningssystem</p>
+          </div>
+          <div className="rounded-2xl bg-white p-6 shadow-lg">{children}</div>
+        </div>
+      </div>
+    );
+  }
+
   const tenant = await getCurrentTenant();
   const logoUrl = tenant ? await getTenantLogoUrl(tenant.id) : null;
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/auth/safe-next";
 
 // F2: magic-link landing — verifies the token hash server-side and sets the session cookie.
 export async function GET(request: Request) {
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   if (tokenHash) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-    if (!error) return NextResponse.redirect(`${origin}/dashboard`);
+    if (!error) return NextResponse.redirect(`${origin}${safeNext(searchParams.get("next"))}`);
   }
   return NextResponse.redirect(`${origin}/login?error=auth`);
 }
