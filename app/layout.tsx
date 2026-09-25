@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { getCurrentTenant } from "@/lib/tenant/current";
 import { createClient } from "@/lib/supabase/server";
+import { buildTenantBackground } from "@/lib/tenant/theme";
 
 // Self-hosted (from @fontsource-variable) so builds don't depend on Google Fonts
 const inter = localFont({
@@ -34,10 +35,11 @@ const THEME_VAR_MAP: Record<string, string> = {
   headerTo: "--color-header-to",
 };
 
-/** F9-R8: server-rendered CSS vars from the tenant's theme jsonb, so there's
- * no flash of default colours. Minimal — components must be updated
- * separately to consume these vars instead of hard-coded Tailwind colours
- * (not done in this change; noted as a simplification). */
+/** F9-R8: server-rendered CSS vars from the tenant's theme jsonb and
+ * bg_gradient_* columns, so there's no flash of default colours.
+ * primary/secondary also remap the purple-main/purple-light tokens that
+ * existing components already use, so saved theme colours are visually
+ * applied instead of sitting unused. */
 async function TenantThemeStyle() {
   const tenant = await getCurrentTenant();
   if (!tenant) return null;
@@ -45,21 +47,28 @@ async function TenantThemeStyle() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("tenants")
-    .select("theme")
+    .select("theme, bg_gradient_from, bg_gradient_via, bg_gradient_to")
     .eq("id", tenant.id)
     .single();
 
-  const theme = data?.theme as Record<string, string> | null;
-  if (!theme) return null;
+  if (!data) return null;
+
+  const theme = data.theme as Record<string, string> | null;
 
   const vars = Object.entries(THEME_VAR_MAP)
-    .filter(([key]) => theme[key])
-    .map(([key, cssVar]) => `${cssVar}:${theme[key]};`)
+    .filter(([key]) => theme?.[key])
+    .map(([key, cssVar]) => `${cssVar}:${theme![key]};`)
     .join("");
 
-  if (!vars) return null;
+  const purpleVars = [
+    theme?.primary ? `--color-purple-main:${theme.primary};` : "",
+    theme?.secondary ? `--color-purple-light:${theme.secondary};` : "",
+  ].join("");
 
-  return <style>{`:root{${vars}}`}</style>;
+  const bgVar = `--tenant-bg:${buildTenantBackground(data)};`;
+
+  const allVars = `${vars}${purpleVars}${bgVar}`;
+  return <style>{`:root{${allVars}}`}</style>;
 }
 
 export default function RootLayout({

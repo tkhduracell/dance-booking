@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current";
+import { isValidHex } from "@/lib/tenant/theme";
 import {
   saveSmtpSettingsForTenant,
   sendSmtpTestEmailForTenant,
@@ -72,7 +73,6 @@ export async function saveGeneralSettings(
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const timezone = (formData.get("timezone") as string | null)?.trim() || "Europe/Stockholm";
   const maxDaysAheadRaw = (formData.get("max_days_ahead") as string | null)?.trim() ?? "";
-  const logoUrl = (formData.get("logo_url") as string | null)?.trim() ?? "";
 
   if (!name) return { error: "Namn krävs." };
   const maxDaysAhead = Number(maxDaysAheadRaw);
@@ -87,7 +87,6 @@ export async function saveGeneralSettings(
       name,
       timezone,
       max_days_ahead: maxDaysAhead,
-      logo_url: logoUrl || null,
     })
     .eq("id", tenant.id);
 
@@ -95,6 +94,117 @@ export async function saveGeneralSettings(
 
   revalidatePath("/admin/settings");
   return { message: "Allmänna inställningar sparade." };
+}
+
+const LOGO_MAX_BYTES = 1024 * 1024;
+const LOGO_MIME_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+/** Verify the file's magic bytes match its declared MIME type — SVG is
+ * deliberately unsupported (stored-XSS risk via inline <script>/on* attrs),
+ * and file.type alone is client-supplied and not trustworthy. */
+function hasValidMagicBytes(bytes: Uint8Array, mimeType: string): boolean {
+  if (mimeType === "image/png") {
+    const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return PNG_SIG.every((b, i) => bytes[i] === b);
+  }
+  if (mimeType === "image/webp") {
+    // "RIFF" .... "WEBP"
+    return (
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    );
+  }
+  return false;
+}
+
+/** F9-R6: upload a tenant logo (png/webp, ≤1MB) to the `tenant-logos`
+ * bucket under the tenant's own folder, and point tenants.logo_path at it. */
+export async function uploadTenantLogo(
+  formData: FormData
+): Promise<{ error?: string; message?: string }> {
+  await requireRole("admin");
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Ingen klubb hittades." };
+
+  const file = formData.get("logo") as File | null;
+  if (!file || file.size === 0) return { error: "Ingen fil vald." };
+  if (file.size > LOGO_MAX_BYTES) return { error: "Filen är för stor (max 1MB)." };
+
+  const ext = LOGO_MIME_EXT[file.type];
+  if (!ext) return { error: "Filtyp stöds ej (använd PNG eller WebP)." };
+
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  if (!hasValidMagicBytes(buffer, file.type)) {
+    return { error: "Filens innehåll matchar inte filtypen." };
+  }
+
+  const supabase = await createClient();
+  const path = `${tenant.id}/logo.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("tenant-logos")
+    .upload(path, buffer, { upsert: true, contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const { error } = await supabase.from("tenants").update({ logo_path: path }).eq("id", tenant.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/settings");
+  return { message: "Logotyp uppladdad." };
+}
+
+export async function removeTenantLogo(): Promise<{ error?: string; message?: string }> {
+  await requireRole("admin");
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Ingen klubb hittades." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("tenants").update({ logo_path: null }).eq("id", tenant.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/settings");
+  return { message: "Logotyp borttagen." };
+}
+
+// ---------- F9-R8: background gradient ----------
+export async function saveBackgroundGradient(
+  formData: FormData
+): Promise<{ error?: string; message?: string }> {
+  await requireRole("admin");
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Ingen klubb hittades." };
+
+  const from = (formData.get("bg_gradient_from") as string | null)?.trim() ?? "";
+  const via = (formData.get("bg_gradient_via") as string | null)?.trim() ?? "";
+  const to = (formData.get("bg_gradient_to") as string | null)?.trim() ?? "";
+
+  if (!from || !isValidHex(from)) return { error: "Ogiltig hex-färg för start." };
+  if (via && !isValidHex(via)) return { error: "Ogiltig hex-färg för mitten." };
+  if (to && !isValidHex(to)) return { error: "Ogiltig hex-färg för slut." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tenants")
+    .update({
+      bg_gradient_from: from,
+      bg_gradient_via: via || null,
+      bg_gradient_to: to || null,
+    })
+    .eq("id", tenant.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/settings");
+  return { message: "Bakgrund sparad." };
 }
 
 // ---------- F9-R8: theme ----------
@@ -131,10 +241,9 @@ export async function saveThemeSettings(
     "headerTo",
   ];
   const theme: Partial<ThemeInput> = {};
-  const hexRe = /^#[0-9a-fA-F]{6}$/;
   for (const f of fields) {
     const v = (formData.get(f) as string | null)?.trim() ?? "";
-    if (v && !hexRe.test(v)) {
+    if (v && !isValidHex(v)) {
       return { error: `Ogiltig hex-färg för ${f}.` };
     }
     if (v) theme[f] = v;

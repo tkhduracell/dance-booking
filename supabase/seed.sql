@@ -61,6 +61,15 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000011' WHERE id = '00000000-0000-0000-0000-000000000001';
 UPDATE public.tenants SET course_room_id = '00000000-0000-0000-0000-000000000012' WHERE id = '00000000-0000-0000-0000-000000000002';
 
+-- F9-R8: Gåsasteget keeps the default purple hero gradient (bg_gradient_*
+-- left NULL, defaults applied in lib/tenant/theme.ts). Nackswinget gets a
+-- distinct gradient so switching ?tenant=nsw is visibly different.
+UPDATE public.tenants SET
+  bg_gradient_from = '#0f3d3e',
+  bg_gradient_via = '#1f6f6e',
+  bg_gradient_to = '#8fd4c9'
+WHERE id = '00000000-0000-0000-0000-000000000002';
+
 -- F9-R10: both tenants' SMTP → local Supabase mail catcher (Inbucket/Mailpit),
 -- no auth needed. See supabase/config.toml [local_smtp] smtp_port.
 UPDATE public.tenants SET

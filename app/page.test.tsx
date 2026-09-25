@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import Home from "./page";
+import HomeAsync from "./page";
 
 vi.useFakeTimers({ shouldAdvanceTime: true });
 vi.setSystemTime(new Date(2026, 3, 8));
@@ -13,27 +13,38 @@ vi.mock("./components/calendar/dans-api", () => ({
   ]),
 }));
 
+vi.mock("@/lib/tenant/current", () => ({
+  getCurrentTenant: vi.fn().mockResolvedValue(null),
+  getTenantLogoUrl: vi.fn().mockResolvedValue(null),
+}));
+
+// Home is an async server component; resolve it to a plain element before
+// rendering with Testing Library (which requires a synchronous component).
+async function Home() {
+  return await HomeAsync();
+}
+
 describe("Home", () => {
-  it("renders heading", () => {
-    render(<Home />);
+  it("renders heading", async () => {
+    render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Schema"
     );
   });
 
-  it("renders the current month heading", () => {
-    render(<Home />);
+  it("renders the current month heading", async () => {
+    render(await Home());
     expect(screen.getAllByText("April 2026").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders Swedish day names", () => {
-    render(<Home />);
+  it("renders Swedish day names", async () => {
+    render(await Home());
     expect(screen.getAllByText("Mån").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Sön").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows dans.se events for current month", async () => {
-    render(<Home />);
+    render(await Home());
     await waitFor(() => {
       expect(screen.getAllByText("Bugg Nybörjare").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Lindy Hop").length).toBeGreaterThan(0);
@@ -41,7 +52,7 @@ describe("Home", () => {
   });
 
   it("navigates to next month", async () => {
-    render(<Home />);
+    render(await Home());
     const nextButtons = screen.getAllByLabelText("Nästa månad");
     fireEvent.click(nextButtons[nextButtons.length - 1]);
     expect(screen.getAllByText("Maj 2026").length).toBeGreaterThanOrEqual(1);
@@ -50,8 +61,8 @@ describe("Home", () => {
     });
   });
 
-  it("navigates to previous month", () => {
-    render(<Home />);
+  it("navigates to previous month", async () => {
+    render(await Home());
     const prevButtons = screen.getAllByLabelText("Föregående månad");
     fireEvent.click(prevButtons[prevButtons.length - 1]);
     expect(screen.getAllByText("Mars 2026").length).toBeGreaterThanOrEqual(1);
