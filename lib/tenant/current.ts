@@ -6,14 +6,20 @@ export interface CurrentTenant {
   slug: string;
 }
 
-/** F9-R6: public URL for the tenant's uploaded logo, or null if unset. */
+/** F9-R6: URL for the tenant's logo, served via app/logo/[slug]/route.ts from
+ * DB-stored bytes. Cache-busted with updated_at so a re-upload shows
+ * immediately. Returns null if unset. */
 export async function getTenantLogoUrl(tenantId: string): Promise<string | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("tenants").select("logo_path").eq("id", tenantId).single();
-  if (!data?.logo_path) return null;
+  const { data } = await supabase
+    .from("tenants")
+    .select("slug, logo_mime, logo_updated_at")
+    .eq("id", tenantId)
+    .single();
+  if (!data?.logo_mime) return null;
 
-  const { data: pub } = supabase.storage.from("tenant-logos").getPublicUrl(data.logo_path);
-  return pub.publicUrl;
+  const v = data.logo_updated_at ? new Date(data.logo_updated_at).getTime() : Date.now();
+  return `/logo/${data.slug}?v=${v}`;
 }
 
 /**

@@ -2,12 +2,7 @@ import { requireRole } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTenant } from "@/lib/tenant/current";
 import { RoomsSection, CategoriesSection } from "./rooms-categories-client";
-import {
-  GeneralSettingsForm,
-  ThemeSettingsForm,
-  LogoUploadForm,
-  BackgroundGradientForm,
-} from "./general-theme-client";
+import { GeneralSettingsForm, LogoUploadForm, TenantThemePanel } from "./general-theme-client";
 import { TenantAdminSmtpForm, TenantAdminDansSeForm } from "./smtp-dans-client";
 import { getTenantLogoUrl } from "@/lib/tenant/current";
 
@@ -28,7 +23,7 @@ export default async function TenantAdminSettingsPage() {
     supabase
       .from("tenants")
       .select(
-        "name, timezone, max_days_ahead, theme, course_room_id, logo_path, bg_gradient_from, bg_gradient_via, bg_gradient_to"
+        "name, timezone, max_days_ahead, theme, course_room_id, logo_mime, bg_gradient_from, bg_gradient_via, bg_gradient_to"
       )
       .eq("id", tenant.id)
       .single(),
@@ -39,7 +34,7 @@ export default async function TenantAdminSettingsPage() {
 
   if (!tenantRow.data) return null;
 
-  const logoUrl = tenantRow.data.logo_path ? await getTenantLogoUrl(tenant.id) : null;
+  const logoUrl = tenantRow.data.logo_mime ? await getTenantLogoUrl(tenant.id) : null;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -73,19 +68,17 @@ export default async function TenantAdminSettingsPage() {
       </div>
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900">Bakgrund</h2>
-        <BackgroundGradientForm
+        <h2 className="text-lg font-semibold text-gray-900">Tema</h2>
+        <TenantThemePanel
+          theme={tenantRow.data.theme as Record<string, string> | null}
           gradient={{
             bg_gradient_from: tenantRow.data.bg_gradient_from,
             bg_gradient_via: tenantRow.data.bg_gradient_via,
             bg_gradient_to: tenantRow.data.bg_gradient_to,
           }}
+          logoUrl={logoUrl}
+          tenantName={tenantRow.data.name}
         />
-      </div>
-
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900">Tema</h2>
-        <ThemeSettingsForm theme={tenantRow.data.theme as Record<string, string> | null} />
       </div>
 
       {smtpStatus.data && (
