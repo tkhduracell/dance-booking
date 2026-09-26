@@ -8,6 +8,7 @@ import { DashboardClient } from "./dashboard-client";
 import { ActivityLog, type ActivityLogRow } from "./activity-log";
 import { WaitingScreen } from "./waiting-screen";
 import { ensureAccessRequest } from "./(protected)/actions";
+import { bookerDisplayName } from "./components/calendar/types";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,28 @@ export default async function Home({
   const categories = categoriesRes.data ?? [];
 
   const now = new Date();
+
+  // F4-R7: resolve booker display names for signed-in members. booked_by is
+  // NULL for former members' bookings (F4-R9), which render as "Tidigare medlem".
+  const bookerIds = Array.from(
+    new Set(
+      (bookingsRes.data ?? [])
+        .map((b) => b.booked_by)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const bookerNames = new Map<string, string>();
+  if (bookerIds.length > 0) {
+    const { data: bookers } = await supabase.rpc("get_user_display_names", {
+      p_user_ids: bookerIds,
+    });
+    if (Array.isArray(bookers)) {
+      for (const u of bookers as { id: string; name: string }[]) {
+        bookerNames.set(u.id, u.name);
+      }
+    }
+  }
+
   const bookings = (bookingsRes.data ?? []).map((b) => ({
     id: b.id,
     roomId: b.room_id,
@@ -86,6 +109,7 @@ export default async function Home({
     endsAt: toTenantLocalIso(b.ends_at, timezone),
     canModify: isAdmin || (b.booked_by === user.id && new Date(b.starts_at) > now),
     hasConflict: Boolean(b.conflict_occasion_id),
+    bookerName: bookerDisplayName(b.booked_by, bookerNames),
   }));
 
   // F5-R6: imported occasions render read-only on the calendar.
