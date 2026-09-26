@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSuperAdmin } from "@/lib/auth/permissions";
 import { safeNext } from "@/lib/auth/safe-next";
 import { sendTenantEmail } from "@/lib/email/mailer";
 import { magicLinkEmail, accessApprovedEmail } from "@/lib/email/templates";
+import { TENANT_COOKIE } from "@/lib/tenant/resolve";
 import {
   saveSmtpSettingsForTenant,
   sendSmtpTestEmailForTenant,
@@ -342,4 +345,62 @@ export async function syncDansSeNow(
   const result = await syncDansSeNowForTenant(tenantId);
   revalidatePath(`/admin/tenants/${slug}`);
   return result;
+}
+
+/** F9-R12: go-live gate — a tenant can't be activated until its SMTP test
+ * (F9-R10) has succeeded. Enforced server-side regardless of what the UI sends. */
+export async function setTenantActive(
+  slug: string,
+  active: boolean
+): Promise<{ error?: string; message?: string }> {
+  await requireSuperAdmin();
+
+  const tenantId = await loadTenantId(slug);
+  if (!tenantId) return { error: "Klubb hittades inte." };
+
+  const supabase = await createClient();
+
+  if (active) {
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("smtp_test_ok")
+      .eq("id", tenantId)
+      .single();
+    if (!tenant?.smtp_test_ok) {
+      return {
+        error:
+          "Klubben kan inte aktiveras: SMTP-testmejlet har inte lyckats än. Skicka ett testmejl under E-post (SMTP) och se till att det lyckas.",
+      };
+    }
+  }
+
+  const { error } = await supabase.from("tenants").update({ active }).eq("id", tenantId);
+  if (error) return { error: error.message };
+
+  await logAudit(tenantId, active ? "activate_tenant" : "deactivate_tenant", {});
+
+  revalidatePath(`/admin/tenants/${slug}`);
+  revalidatePath("/admin/tenants");
+  return { message: active ? "Klubb aktiverad." : "Klubb inaktiverad." };
+}
+
+/** F9-R3: a super-admin opens a tenant and acts as its admin there,
+ * bypassing the approval queue (is_tenant_admin already treats super-admins
+ * as tenant admins everywhere, so no membership is created). Sets the
+ * tenant cookie for this browser and writes a platform_audit_log row.
+ * Note: on a registered custom domain the cookie is ignored (the domain
+ * always wins in lib/supabase/middleware.ts) — the super-admin must open
+ * the tenant's own domain to act there. */
+export async function openTenantAsAdmin(slug: string): Promise<never> {
+  await requireSuperAdmin();
+
+  const tenantId = await loadTenantId(slug);
+  if (!tenantId) redirect("/admin/tenants");
+
+  await logAudit(tenantId, "open_as_admin", { slug });
+
+  const cookieStore = await cookies();
+  cookieStore.set(TENANT_COOKIE, slug, { path: "/", sameSite: "lax" });
+
+  redirect("/admin");
 }

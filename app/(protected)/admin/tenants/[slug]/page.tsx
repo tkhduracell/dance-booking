@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SmtpSettingsForm } from "./smtp-settings-form";
 import { DansSeSettingsForm } from "./dans-se-settings-form";
 import { MembersSection } from "./members-section";
+import { TenantStatusActions } from "./tenant-status-actions";
 import { listTenantMembers, listPendingRequests } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function TenantSettingsPage({
 
   const { data: tenantRow } = await supabase
     .from("tenants")
-    .select("id")
+    .select("id, active")
     .eq("slug", slug)
     .single();
   const tenantId = tenantRow?.id as string;
@@ -44,6 +45,12 @@ export default async function TenantSettingsPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">{slug} — inställningar</h1>
+
+      <TenantStatusActions
+        slug={slug}
+        active={Boolean(tenantRow?.active)}
+        smtpTestOk={Boolean(tenant.smtp_test_ok)}
+      />
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-gray-900">E-post (SMTP)</h2>

@@ -16,7 +16,9 @@ export default async function SuperAdminPage() {
   const supabase = await createClient();
   const { data: tenants } = await supabase
     .from("tenants")
-    .select("id, name, slug, active, created_at, tenant_domains(domain)")
+    .select(
+      "id, name, slug, active, created_at, tenant_domains(domain), dans_se_last_synced_at, dans_se_last_sync_error, smtp_test_ok, smtp_test_at"
+    )
     .order("created_at", { ascending: false });
 
   const admin = createAdminClient();
@@ -59,6 +61,8 @@ export default async function SuperAdminPage() {
                 <th className="pb-2 text-left font-medium text-gray-500">Domäner</th>
                 <th className="pb-2 text-left font-medium text-gray-500">Medlemmar</th>
                 <th className="pb-2 text-left font-medium text-gray-500">Väntande</th>
+                <th className="pb-2 text-left font-medium text-gray-500">Senaste synk</th>
+                <th className="pb-2 text-left font-medium text-gray-500">SMTP</th>
                 <th className="pb-2 text-left font-medium text-gray-500">Status</th>
                 <th className="pb-2 text-left font-medium text-gray-500"></th>
               </tr>
@@ -75,6 +79,34 @@ export default async function SuperAdminPage() {
                   </td>
                   <td className="py-2 text-gray-700">{counts.get(t.id)?.members ?? 0}</td>
                   <td className="py-2 text-gray-700">{counts.get(t.id)?.pending ?? 0}</td>
+                  <td className="py-2 text-gray-700">
+                    {t.dans_se_last_synced_at ? (
+                      new Date(t.dans_se_last_synced_at).toLocaleString("sv-SE")
+                    ) : (
+                      "-"
+                    )}
+                    {t.dans_se_last_sync_error ? (
+                      <span className="ml-1 text-red-600" title={t.dans_se_last_sync_error}>
+                        (fel)
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="py-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        t.smtp_test_ok
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {t.smtp_test_ok ? "OK" : "Ej testad"}
+                    </span>
+                    {t.smtp_test_at ? (
+                      <span className="ml-1 text-xs text-gray-500">
+                        {new Date(t.smtp_test_at).toLocaleDateString("sv-SE")}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="py-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
