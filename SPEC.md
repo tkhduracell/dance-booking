@@ -73,7 +73,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 **Requirements**
 - F1-R1 `/` shows a month calendar (Mon–Sun, Swedish labels), current month by default, prev/next navigation. `Implemented`
 - F1-R2 Shows imported course occasions and bookings together; each shows `HH:MM title`, room and category colour. **Booker names are not shown to visitors.** **(change)**
-- F1-R3 Filter by room (all rooms by default). `Planned`
+- F1-R3 Filter by room (all rooms by default). `Done`
 - F1-R4 Today is highlighted. `Implemented`
 - F1-R5 Colour legend: imported courses + each tenant category.
 - F1-R6 Selecting a day shows a day view with all its items in full (mobile-friendly, since month cells truncate). `Planned`
@@ -294,7 +294,7 @@ activity_log(id, tenant_id, booking_id, actor_id NULL, type created|moved|edited
 - F9-R7 `Done` (unchanged) **dans.se import:** dans.se link or org slug and API token — still at `/admin/tenants/[slug]`; save/sync logic factored into `lib/tenant-settings/save.ts` and reused by `/admin/settings`.
 - F9-R8 `Partial` **Theme** (`/admin/settings`): hex colour inputs for primary, primary text (on primary), secondary, accent, background, surface, text, muted text, header gradient start/end; saved to `tenants.theme` jsonb. Applied as server-rendered CSS variables in the root layout (`:root{--color-primary:...}` etc., no flash of default colours). Additionally, `tenants.bg_gradient_from/via/to` (hex, `via` and `to` nullable — a solid colour when only `from` is set) drive `--tenant-bg`, consumed by the `hero-gradient` utility (used on the start-page hero, the auth layout background, and the protected header) in place of the old hard-coded gradient; defaults reproduce the current Gåsasteget look (`#2d284d` → `#4b4280` → `#9e97c4`). `--color-primary`/`--color-secondary` now also drive the `purple-main`/`purple-light` Tailwind tokens so the saved theme colours are visually applied, not just present as unused CSS vars. No live preview beyond the gradient/logo pickers' own inline preview, no "Återställ standard", no contrast warning (all skipped).
 - F9-R10 **E-post (SMTP):** host, port, security (TLS/STARTTLS), username, password, from name, from address. **All tenant email (magic links, queue notifications, decisions, booking notifications) is sent through this server.** "Skicka testmejl" sends a test to the current admin and shows the result. Send failures are logged and shown to admins in settings. `Done` — implemented at `/admin/tenants/[slug]` (not yet `/admin/settings`; tenant-admin-facing route is future work).
-- F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them. `Done` for SMTP password (app-side AES-256-GCM, `SMTP_ENC_KEY`); dans.se token encryption unchanged/still plaintext.
+- F9-R11 **Secrets** (dans.se token, SMTP password): stored encrypted at rest, server-only (never sent to the browser, no RLS read access), write-only in the UI (shown as "••• sparad", can be replaced or removed, never displayed again), never written to logs. Only tenant admins and super-admins can set them. `Done` for both SMTP password and dans.se token (app-side AES-256-GCM, `SMTP_ENC_KEY`, via `encryptSecret` in `lib/tenant-settings/save.ts`).
 
 **Data model**
 ```
@@ -308,7 +308,7 @@ tenant_domains(domain PK, tenant_id)
 rooms(id, tenant_id, title, description, active, sort_order)
 categories(id, tenant_id, name, color, active, sort_order)
 email_log(id, tenant_id, to_address, template, ok, error NULL, created_at)  -- no bodies stored
-audit_log(id, actor_id, tenant_id NULL, action, details jsonb, created_at)
+platform_audit_log(id, created_at, actor_user_id, actor_email, tenant_id NULL, action, details jsonb)
 ```
 `theme` = `{ primary, onPrimary, secondary, accent, background, surface, text, mutedText, headerFrom, headerTo }` (hex).
 
