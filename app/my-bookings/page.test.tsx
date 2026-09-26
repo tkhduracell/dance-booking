@@ -13,10 +13,20 @@ afterAll(() => {
 
 vi.mock("@/lib/tenant/current", () => ({
   getCurrentTenant: vi.fn().mockResolvedValue({ id: "tenant-1", slug: "gasasteget" }),
+  getTenantLogoUrl: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({
   getCurrentUser: vi.fn().mockResolvedValue({ id: "user-1", roles: ["booker"], permissions: [] }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: vi.fn().mockReturnValue({ push: vi.fn(), refresh: vi.fn() }),
+  redirect: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: vi.fn().mockReturnValue({ auth: { signOut: vi.fn() } }),
 }));
 
 function makeSupabaseMock() {

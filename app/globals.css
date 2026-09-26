@@ -24,8 +24,16 @@
   --tenant-bg: linear-gradient(180deg, #2d284d 0%, #4b4280 55%, #9e97c4 100%);
 }
 
+/* App is light-only: force light UA rendering (form controls, scrollbars)
+ * regardless of the OS/browser color scheme, and pin explicit body colors
+ * so text stays readable instead of inheriting a dark canvas. */
+:root {
+  color-scheme: light;
+}
+
 @layer base {
   body {
+    background: #ffffff;
     color: #363636;
   }
   h1,

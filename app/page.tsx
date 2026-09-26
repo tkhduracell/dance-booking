@@ -1,4 +1,5 @@
 import { Logo } from "@/app/components/logo";
+import { AppHeader } from "@/app/components/app-header";
 import { MonthCalendar } from "./components/calendar/MonthCalendar";
 import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,7 @@ export default async function Home({
   if (!tenant) return null;
 
   const isAdmin = currentUser.roles.includes("admin");
+  const logoUrl = await getTenantLogoUrl(tenant.id);
 
   const [tenantRow, roomsRes, categoriesRes, bookingsRes, logRes, importedRes] =
     await Promise.all([
@@ -177,15 +179,18 @@ export default async function Home({
   });
 
   return (
-    <div>
-      <DashboardClient
-        rooms={rooms}
-        categories={categories}
-        bookings={bookings}
-        importedOccasions={importedOccasions}
-        selectedRoomId={selectedRoomId ?? null}
-      />
-      <ActivityLog entries={activityEntries} />
+    <div className="min-h-screen bg-gray-warm">
+      <AppHeader logoUrl={logoUrl} userEmail={user.email} isAdmin={isAdmin} />
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+        <DashboardClient
+          rooms={rooms}
+          categories={categories}
+          bookings={bookings}
+          importedOccasions={importedOccasions}
+          selectedRoomId={selectedRoomId ?? null}
+        />
+        <ActivityLog entries={activityEntries} />
+      </main>
     </div>
   );
 }
