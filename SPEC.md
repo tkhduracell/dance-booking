@@ -230,7 +230,7 @@ dans_se_sync_runs(id, tenant_id, started_at, finished_at, ok, error NULL, events
 - F6-R4 Calendar: **month and week** (week with time axis). Default: week on desktop, month on mobile. Items show time, title, category colour and the booker's name; own bookings and conflict-flagged bookings are highlighted. `Implemented` (view toggle + week time-axis; booker-name/own-booking highlighting still `Planned`)
 - F6-R5 A primary button **"+ Lägg till aktivitet"** (always visible: in the header on desktop, floating action button on mobile) opens the booking form (F4-R1), prefilled with the selected room and, if a day/time slot was clicked, that date/time.
 - F6-R6 Clicking a booking opens its details; the booker (own, before start) or an admin sees **Flytta** and **Ställ in** (F4-R4/R5). Imported courses show details and a link to dans.se only.
-- F6-R7 "Mina bokningar": list of the user's upcoming bookings (conflicts first), reachable from the user menu or sidebar. `Implemented` (`/mina-bokningar`, linked from the dashboard header; no dedicated user menu yet, see F6-R2)
+- F6-R7 "Mina bokningar": list of the user's upcoming bookings (conflicts first), reachable from the user menu or sidebar. `Implemented` (`/my-bookings`, linked from the dashboard header; no dedicated user menu yet, see F6-R2)
 - F6-R8 The activity log (F8) is shown in the member view (below the calendar or as a sidebar section).
 - F6-R9 Mobile (<768px): the sidebar collapses into a room selector (dropdown/drawer) above the calendar; no horizontal scroll at 360px.
 

@@ -121,12 +121,12 @@ export function DashboardClient({
           <div className="flex-1">
             <RoomSidebar rooms={rooms} />
           </div>
-          <Link href="/mina-bokningar" className="shrink-0 text-sm font-semibold text-purple-dark hover:underline">
+          <Link href="/my-bookings" className="shrink-0 text-sm font-semibold text-purple-dark hover:underline">
             Mina bokningar
           </Link>
         </div>
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
-          <Link href="/mina-bokningar" className="text-sm font-semibold text-purple-dark hover:underline">
+          <Link href="/my-bookings" className="text-sm font-semibold text-purple-dark hover:underline">
             Mina bokningar
           </Link>
           <div className="flex overflow-hidden rounded-full border border-purple-dark/20">
