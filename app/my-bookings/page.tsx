@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
-import { getCurrentTenant } from "@/lib/tenant/current";
+import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
 import { toTenantLocalIso } from "@/lib/tenant/timezone";
 import { sortMyBookings, upcomingBookings, type MyBooking } from "@/lib/bookings/my-bookings";
+import { AppHeader } from "@/app/components/app-header";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,9 @@ export default async function MinaBokningarPage() {
 
   const tenant = await getCurrentTenant();
   if (!tenant) return null;
+
+  const isAdmin = currentUser.roles.includes("admin");
+  const logoUrl = await getTenantLogoUrl(tenant.id);
 
   const [tenantRow, roomsRes, bookingsRes] = await Promise.all([
     supabase.from("tenants").select("timezone").eq("id", tenant.id).single(),
@@ -50,42 +54,45 @@ export default async function MinaBokningarPage() {
   const bookings = sortMyBookings(upcomingBookings(all, nowLocalIso));
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl bg-gray-warm px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-xl font-extrabold uppercase tracking-[0.1em] text-purple-dark">
-          Mina bokningar
-        </h1>
-        <Link href="/" className="text-sm font-semibold text-purple-dark hover:underline">
-          ← Till kalendern
-        </Link>
-      </div>
+    <div className="min-h-screen bg-gray-warm">
+      <AppHeader logoUrl={logoUrl} userEmail={user.email} isAdmin={isAdmin} />
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="font-display text-xl font-extrabold uppercase tracking-[0.1em] text-purple-dark">
+            Mina bokningar
+          </h1>
+          <Link href="/" className="text-sm font-semibold text-purple-dark hover:underline">
+            ← Till kalendern
+          </Link>
+        </div>
 
-      {bookings.length === 0 ? (
-        <p className="text-sm text-gray-600">Du har inga kommande bokningar.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {bookings.map((b) => (
-            <li
-              key={b.id}
-              className={`rounded-lg border px-4 py-3 ${
-                b.hasConflict ? "border-red-300 bg-red-50" : "border-gray-warm bg-white"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-purple-dark">{b.title}</span>
-                {b.hasConflict && (
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                    Krockar
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-600">
-                {b.startsAt.slice(0, 10)} {b.startsAt.slice(11, 16)}–{b.endsAt.slice(11, 16)} · {b.roomTitle}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+        {bookings.length === 0 ? (
+          <p className="text-sm text-gray-600">Du har inga kommande bokningar.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {bookings.map((b) => (
+              <li
+                key={b.id}
+                className={`rounded-lg border px-4 py-3 ${
+                  b.hasConflict ? "border-red-300 bg-red-50" : "border-gray-warm bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-purple-dark">{b.title}</span>
+                  {b.hasConflict && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      Krockar
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600">
+                  {b.startsAt.slice(0, 10)} {b.startsAt.slice(11, 16)}–{b.endsAt.slice(11, 16)} · {b.roomTitle}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+    </div>
   );
 }

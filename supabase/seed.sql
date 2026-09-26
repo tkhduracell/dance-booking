@@ -214,6 +214,29 @@ FROM auth.users u
 WHERE NOT EXISTS (SELECT 1 FROM auth.identities i WHERE i.user_id = u.id);
 
 -- ============================================================
+-- F9-R5: default categories for each seeded tenant (idempotent).
+-- Must run here, not just in the migration, because the migration's
+-- "seed existing tenants" backfill runs before this file creates the
+-- tenant rows (Gåsasteget/Nackswinget) — so on a fresh db it seeds
+-- nothing. A trigger (see migrations) covers tenants created later.
+-- ============================================================
+INSERT INTO public.categories (tenant_id, name, color, sort_order)
+SELECT t.id, c.name, c.color, c.sort_order
+FROM public.tenants t
+CROSS JOIN (VALUES
+  ('Träning', '#0B6E4F', 0),
+  ('Privatlektion', '#8E5B3F', 1),
+  ('Föreningsaktivitet', '#3F5B8E', 2)
+) AS c(name, color, sort_order)
+WHERE t.id IN (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000002'
+)
+AND NOT EXISTS (
+  SELECT 1 FROM public.categories cc WHERE cc.tenant_id = t.id
+);
+
+-- ============================================================
 -- F4/F8: sample bookings for Gåsasteget, booked by the test booker.
 -- ============================================================
 DO $$
@@ -250,5 +273,46 @@ BEGIN
     VALUES
       (gasasteget_id, booking1, booker_id, 'created', NULL, jsonb_build_object('title', 'Träning', 'roomId', stora_id)),
       (gasasteget_id, booking2, booker_id, 'created', NULL, jsonb_build_object('title', 'Privatlektion', 'roomId', stora_id));
+  END IF;
+END $$;
+
+-- ============================================================
+-- F4/F8: sample bookings for Nackswinget, booked by the super-admin
+-- (only membership seeded for Gåsasteget's test users).
+-- ============================================================
+DO $$
+DECLARE
+  nsw_id UUID := '00000000-0000-0000-0000-000000000002';
+  stora_id UUID := '00000000-0000-0000-0000-000000000012';
+  actor_id UUID;
+  training_cat UUID;
+  social_cat UUID;
+  booking1 UUID;
+  booking2 UUID;
+BEGIN
+  SELECT id INTO actor_id FROM auth.users WHERE email = 'buggfille@gmail.com';
+  SELECT id INTO training_cat FROM public.categories WHERE tenant_id = nsw_id AND name = 'Träning';
+  SELECT id INTO social_cat FROM public.categories WHERE tenant_id = nsw_id AND name = 'Föreningsaktivitet';
+
+  IF actor_id IS NOT NULL AND training_cat IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.bookings WHERE tenant_id = nsw_id) THEN
+    INSERT INTO public.bookings (tenant_id, room_id, booked_by, category_id, title, starts_at, ends_at)
+    VALUES (
+      nsw_id, stora_id, actor_id, training_cat, 'Träning',
+      (date_trunc('day', now()) + interval '2 days' + interval '18 hours'),
+      (date_trunc('day', now()) + interval '2 days' + interval '20 hours')
+    ) RETURNING id INTO booking1;
+
+    INSERT INTO public.bookings (tenant_id, room_id, booked_by, category_id, title, starts_at, ends_at)
+    VALUES (
+      nsw_id, stora_id, actor_id, social_cat, 'Föreningsaktivitet',
+      (date_trunc('day', now()) + interval '6 days' + interval '19 hours'),
+      (date_trunc('day', now()) + interval '6 days' + interval '21 hours')
+    ) RETURNING id INTO booking2;
+
+    INSERT INTO public.activity_log (tenant_id, booking_id, actor_id, type, before, after)
+    VALUES
+      (nsw_id, booking1, actor_id, 'created', NULL, jsonb_build_object('title', 'Träning', 'roomId', stora_id)),
+      (nsw_id, booking2, actor_id, 'created', NULL, jsonb_build_object('title', 'Föreningsaktivitet', 'roomId', stora_id));
   END IF;
 END $$;

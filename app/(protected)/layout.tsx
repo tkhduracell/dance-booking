@@ -1,11 +1,8 @@
-import Link from "next/link";
-import { Logo } from "@/app/components/logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/permissions";
 import { getCurrentTenant, getTenantLogoUrl } from "@/lib/tenant/current";
-import { SignOutButton } from "@/app/components/auth/sign-out-button";
-import { DeleteAccountButton } from "@/app/components/auth/delete-account-button";
+import { AppHeader } from "@/app/components/app-header";
 
 export default async function ProtectedLayout({
   children,
@@ -34,34 +31,7 @@ export default async function ProtectedLayout({
 
   return (
     <div className="min-h-screen bg-gray-warm">
-      <header className="hero-gradient text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="shrink-0"><Logo variant="horizontal" className="h-8 w-auto" logoUrl={logoUrl} /></Link>
-            <nav className="flex gap-4 text-sm">
-              <Link
-                href="/"
-                className="text-white/80 hover:text-white"
-              >
-                Dashboard
-              </Link>
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="text-white/80 hover:text-white"
-                >
-                  Admin
-                </Link>
-              )}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-white/80">{user.email}</span>
-            <DeleteAccountButton />
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader logoUrl={logoUrl} userEmail={user.email} isAdmin={isAdmin} />
       <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
     </div>
   );
