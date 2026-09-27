@@ -91,7 +91,7 @@ Permissions stay data-driven (`roles`, `permissions`, `role_permissions`), but r
 **Requirements**
 - F2-R1 Sign-in methods: **email magic link / one-time code**, Google, Facebook, Microsoft (Outlook/Azure, personal + work accounts). All via Supabase Auth. **(change)** replaces email+password.
 - F2-R2 One page `/login` offers all methods; there is no separate sign-up page. First sign-in creates the account. **(change)**
-- F2-R3 **Magic-link emails are sent by the app through the tenant's own SMTP (F9-R10)**, not by Supabase's mailer: the server generates the link/code with the Supabase admin API (`auth.admin.generateLink`), renders a Swedish email with the tenant's name and branding, and sends it. Supabase's built-in email sending is not used.
+- F2-R3 **Magic-link emails are sent by the app through the tenant's own SMTP (F9-R10)**, not by Supabase's mailer: the server generates the link/code with the Supabase admin API (`auth.admin.generateLink`), renders a Swedish email with the tenant's name and branding, and sends it. Supabase's built-in email sending is not used. Bootstrap: while a tenant has no SMTP configured, the magic link is sent by Supabase's built-in mailer (PKCE via `/auth/callback`) so the first admin can sign in and configure SMTP.
 - F2-R4 Accounts are global (one person, one account across tenants). Signing in with a provider whose verified email matches an existing account links to that account (Supabase identity linking). Q-25
 - F2-R5 After sign-in the user returns to the tenant domain and page they started from. **(change, F0)**
 - F2-R6 Unauthenticated access to app routes (`/`, `/admin`, booking pages) redirects to `/login?next=<path>`; signed-in users on `/login` go to `/`.
