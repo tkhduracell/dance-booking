@@ -21,8 +21,20 @@ export async function sendMagicLink(
   }
 
   const tenant = await getCurrentTenant();
-  if (!tenant) {
-    return { error: "Ingen klubb hittades." };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
+
+  // F2-R3 bootstrap: until the tenant has SMTP configured, fall back to
+  // Supabase's built-in mailer (PKCE code flow via /auth/callback).
+  if (!tenant || !(await getTenantSmtpConfig(tenant.id))) {
+    const supabase = await createClient();
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: trimmed,
+      options: {
+        emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(safeNext(next))}`,
+      },
+    });
+    return otpError ? { error: "Kunde inte skicka inloggningslänk." } : {};
   }
 
   const admin = createAdminClient();
@@ -33,21 +45,6 @@ export async function sendMagicLink(
     .eq("id", tenant.id)
     .single();
   const tenantName = tenantRow?.name ?? tenant.slug;
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
-
-  // F2-R3 bootstrap: until the tenant has SMTP configured, fall back to
-  // Supabase's built-in mailer (PKCE code flow via /auth/callback).
-  if (!(await getTenantSmtpConfig(tenant.id))) {
-    const supabase = await createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: trimmed,
-      options: {
-        emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(safeNext(next))}`,
-      },
-    });
-    return otpError ? { error: "Kunde inte skicka inloggningslänk." } : {};
-  }
 
   // F2: first sign-in creates the account (auto-queued later on first visit)
   const gen = () =>
