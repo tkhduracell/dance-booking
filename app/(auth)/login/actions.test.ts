@@ -65,10 +65,12 @@ describe("sendMagicLink (F2-R3)", () => {
     expect(mockGenerateLink).not.toHaveBeenCalled();
   });
 
-  it("rejects when no tenant is resolved", async () => {
+  it("uses Supabase's mailer when no tenant is resolved", async () => {
     mockGetCurrentTenant.mockResolvedValue(null);
     const result = await sendMagicLink("user@example.com");
-    expect(result.error).toBeDefined();
+    expect(result.error).toBeUndefined();
+    expect(mockSignInWithOtp).toHaveBeenCalled();
+    expect(mockSendTenantEmail).not.toHaveBeenCalled();
   });
 
   it("generates a link via the admin API and sends it through tenant SMTP", async () => {

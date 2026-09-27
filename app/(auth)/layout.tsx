@@ -6,7 +6,9 @@ export default async function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  if (await isTenantFallback()) {
+  const tenant = await getCurrentTenant();
+  // Neutral when no club was resolved, or only via the DEFAULT_TENANT fallback.
+  if (!tenant || (await isTenantFallback())) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-900 px-4">
         <div className="w-full max-w-sm">
@@ -20,8 +22,7 @@ export default async function AuthLayout({
     );
   }
 
-  const tenant = await getCurrentTenant();
-  const logoUrl = tenant ? await getTenantLogoUrl(tenant.id) : null;
+  const logoUrl = await getTenantLogoUrl(tenant.id);
 
   return (
     <div className="flex min-h-screen items-center justify-center hero-gradient px-4">
