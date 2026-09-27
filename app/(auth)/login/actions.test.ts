@@ -7,6 +7,14 @@ const { mockGetCurrentTenant, mockGenerateLink, mockSendTenantEmail, mockSingle 
     mockSendTenantEmail: vi.fn(async () => {}),
     mockSingle: vi.fn(),
   }));
+const { mockGetSmtp, mockSignInWithOtp } = vi.hoisted(() => ({
+  mockGetSmtp: vi.fn(),
+  mockSignInWithOtp: vi.fn(async () => ({ error: null })),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({ auth: { signInWithOtp: mockSignInWithOtp } })),
+}));
 
 vi.mock("@/lib/tenant/current", () => ({
   getCurrentTenant: mockGetCurrentTenant,
@@ -23,6 +31,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/email/mailer", () => ({
   sendTenantEmail: mockSendTenantEmail,
+  getTenantSmtpConfig: mockGetSmtp,
 }));
 
 import { sendMagicLink } from "./actions";
@@ -32,6 +41,22 @@ describe("sendMagicLink (F2-R3)", () => {
     vi.clearAllMocks();
     mockGetCurrentTenant.mockResolvedValue({ id: "tenant-1", slug: "gasasteget" });
     mockSingle.mockResolvedValue({ data: { name: "Gåsasteget" } });
+    mockGetSmtp.mockResolvedValue({ host: "smtp.example.com" });
+  });
+
+  it("falls back to Supabase's mailer when the tenant has no SMTP", async () => {
+    mockGetSmtp.mockResolvedValue(null);
+    const result = await sendMagicLink("user@example.com", "/admin");
+    expect(result.error).toBeUndefined();
+    expect(mockSignInWithOtp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "user@example.com",
+        options: expect.objectContaining({
+          emailRedirectTo: expect.stringContaining("/auth/callback?next=%2Fadmin"),
+        }),
+      })
+    );
+    expect(mockGenerateLink).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid email", async () => {

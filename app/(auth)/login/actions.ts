@@ -3,7 +3,8 @@
 import { safeNext } from "@/lib/auth/safe-next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTenant } from "@/lib/tenant/current";
-import { sendTenantEmail } from "@/lib/email/mailer";
+import { getTenantSmtpConfig, sendTenantEmail } from "@/lib/email/mailer";
+import { createClient } from "@/lib/supabase/server";
 import { magicLinkEmail } from "@/lib/email/templates";
 
 /**
@@ -34,6 +35,19 @@ export async function sendMagicLink(
   const tenantName = tenantRow?.name ?? tenant.slug;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
+
+  // F2-R3 bootstrap: until the tenant has SMTP configured, fall back to
+  // Supabase's built-in mailer (PKCE code flow via /auth/callback).
+  if (!(await getTenantSmtpConfig(tenant.id))) {
+    const supabase = await createClient();
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: trimmed,
+      options: {
+        emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(safeNext(next))}`,
+      },
+    });
+    return otpError ? { error: "Kunde inte skicka inloggningslänk." } : {};
+  }
 
   // F2: first sign-in creates the account (auto-queued later on first visit)
   const gen = () =>
